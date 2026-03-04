@@ -23,7 +23,7 @@ Créer une plateforme de vote électronique sécurisée permettant aux entrepris
 1. **Page d'accueil** - Landing + connexion
 2. **Page d'inscription** - Création de compte + wallet
 3. **Page création de scrutin** - Paramétrage + sélection des votants
-4. **Page vote** - Vote pour les électeurs
+4. **Page vote** - Vote pour les lecteurs
 5. **Page consultation scrutin** - Résultats (v2)
 
 ### 2.2 Flux Utilisateur
@@ -83,7 +83,7 @@ CREATE TABLE scrutins (
     end_date TIMESTAMP NOT NULL,
     status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'closed', 'finished')),
     voting_system VARCHAR(50) DEFAULT 'majority',
-    registry_hash VARCHAR(66),  -- Hash du registre des votants on-chain
+    registry_hash VARCHAR(66),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -94,9 +94,9 @@ CREATE TABLE votants_scrutin (
     user_id INTEGER REFERENCES users(id),
     wallet_address VARCHAR(42),
     email VARCHAR(255),
-    nft_hash VARCHAR(66),  -- Hash de la transaction NFT
+    nft_hash VARCHAR(66),
     has_voted BOOLEAN DEFAULT FALSE,
-    vote_hash VARCHAR(66),  -- Hash de la transaction de vote
+    vote_hash VARCHAR(66),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(scrutin_id, user_id)
 );
@@ -156,108 +156,152 @@ CREATE TABLE votes (
 
 ### EPIC 1 – Authentification & Wallet
 **US :** 01, 02, 03
-- Inscription utilisateur avec génération wallet
-- Inscription organisateur
-- Inscription votant
 
 ### EPIC 2 – Paramétrage & Création du vote
 **US :** 07, 08, 15, 22
-- Créer vote pour/contre
-- Créer vote uninominal 1 tour
-- Sélectionner votants
-- Définir durée
 
 ### EPIC 3 – Sécurisation Blockchain & NFT (MVP)
 **US :** 16, 17, 19, 20, 25
-- Hasher registre votants (on-chain)
-- Émettre NFT droit de vote
-- Vote unique (irrevocable)
-- Preuve de vote (hash transaction)
-- Vérifier intégrité registre
 
 ### EPIC 4 – Processus de vote
 **US :** 06, 09, 18, 21
-- Voter pour/contre
-- Voter uninominal 1 tour
-- Recevoir invitation
-- Clôture automatique
 
 ### EPIC 5 – Résultats & Conformité réglementaire
 **US :** 10, 11, 12, 14, 23, 24
-- Score participation
-- Consulter résultats (organisateur)
-- Consulter résultats (votant)
-- Publier résultats
-- Visualiser taux participation
-- Vérifier quorum 50%
 
 ### EPIC 6 – Scrutins avancés
 **US :** 04, 05, 26
-- Créer vote uninominal à deux tours
-- Voter uninominal à deux tours
-- Gérer égalité
 
 ### EPIC 7 – Vote confidentiel avancé (V2)
 **US :** 28, 29
-- Vote homomorphe
-- Dépouillement sécurisé
 
 ---
 
-## 6. Spécifications Fonctionnelles
+## 6. Spécifications Détaillées
 
-### 6.1 Inscription & Wallet
+### 6.1 Gestion des Identités et Authentification
 
-1. **Création de compte**
-   - Email + mot de passe
-   - Génération wallet automatique
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Inscription / Vérification d'identité** | Enregistrement des électeurs avec vérification et/ou validation par l'organisation |
+| **Authentification forte** | MFA (Multi-Factor Authentication), certificats numériques ou clés cryptographiques |
+| **Séparation identité / vote** | Mécanisme de "blind signature" ou ZKP pour garantir l'anonymat tout en prouvant l'éligibilité |
 
-2. **Association wallet**
-   - Wallet lié au compte utilisateur
+#### Flux d'authentification
+```
+Utilisateur → Inscription → Vérification email
+                       ↓
+              Vérification identité (KYC optionnel)
+                       ↓
+              Génération wallet automatique
+                       ↓
+              MFA activé (optionnel)
+```
 
-### 6.2 Création de Scrutin
+### 6.2 Gestion des Scrutins
 
-1. **Paramétrage**
-   - Titre + description
-   - Date de début / fin
-   - Système de vote
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Création de scrutin** | Définir le type (majorité simple, proportionnel, pondéré…), la durée, les candidats/options |
+| **Paramétrage des droits** | Qui peut voter, quorum minimum, poids des votes si applicable |
+| **Cycle de vie** | Brouillon → Ouvert → Clos → Dépouillé → Archivé |
+| **Multi-tours** | Support de scrutins à plusieurs tours si nécessaire |
 
-2. **Sélection des votants**
-   - Import liste emails / wallets
-   - OU sélection manuelle
-
-3. **Publication**
-   - Hash du registre des votants on-chain
-   - Mint NFT pour chaque votant
-   - Envoi des invitations
+#### Cycle de vie d'un scrutin
+```
+[Brouillon] → [Ouvert] → [Clos] → [Dépouillé] → [Archivé]
+     ↑            ↓          ↓           ↓            ↓
+     └────────────┴───────────┴───────────┴────────────┘
+```
 
 ### 6.3 Processus de Vote
 
-1. **Accès**
-   - Seuls les personnes avec NFT peuvent voir le scrutin
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Chiffrement bout-en-bout** | Le vote est chiffré côté client avant envoi |
+| **Non-répudiation** | Preuve que le vote a été enregistré (reçu cryptographique) |
+| **Unicité** | Un électeur = un vote (empêcher le double vote) |
+| **Modification contrôlée** | Possibilité (ou non) de modifier son vote tant que le scrutin est ouvert |
+| **Vote blanc / abstention** | Support explicite |
 
-2. **Vote**
-   - Sélection de l'option
-   - Transaction on-chain
+#### Flux de vote
+```
+[Votant se connecte] → [Vérification droit de vote]
+                           ↓
+              [Prépare vote (chiffré client)]
+                           ↓
+              [Soumet vote + preuve ZKP]
+                           ↓
+              [Reçu cryptographique]
+                           ↓
+              [Hash envoyé au votant]
+```
 
-3. **Confirmation**
-   - Hash de transaction envoyé au votant
-   - Lien vers block explorer
+### 6.4 Dépouillement et Résultats
 
-### 6.4 Clôture & Résultats
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Déchiffrement distribué** | Clé de déchiffrement partagée / aucun acteur seul ne peut déchiffrer |
+| **Calcul vérifiable** | Le résultat peut être recalculé indépendamment par tout auditeur |
+| **Publication** | Résultats accessibles avec preuve cryptographique d'intégrité |
 
-1. **Triggers de clôture**
-   - Durée écoulée
-   - OU 100% des votants ont votés
+### 6.5 Auditabilité
 
-2. **Résultats**
-   - Publication sur la page
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Journal d'audit** | Traçabilité complète des événements (création, ouverture, votes chiffrés, clôture, dépouillement) |
+| **Vérification individuelle** | Chaque électeur peut vérifier que son vote a été comptabilisé |
+| **Vérification universelle** | Tout observateur peut vérifier l'intégrité globale du scrutin |
+| **Export de preuves** | Génération de rapports d'audit téléchargeables |
 
-### 6.5 Règles de Scrutin
+#### Événements audités
+- Création du scrutin
+- Modification des paramètres
+- Ouverture du vote
+- Votes reçus (commitments)
+- Clôture du scrutin
+- Dépouillement
+- Publication des résultats
+
+### 6.6 Accessibilité et UX
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Multi-plateforme** | Web responsive, mobile (PWA ou natif) |
+| **Accessibilité WCAG 2.1 AA** | Lecteurs d'écran, navigation clavier, contrastes |
+| **Multilingue** | i18n dès la conception |
+| **Mode hors-ligne partiel** | Possibilité de préparer son vote hors-ligne puis de le soumettre |
+
+### 6.7 Administration et Gouvernance
+
+| Rôle | Permissions |
+|------|-------------|
+| **Super-admin** | Gestion globale de la plateforme |
+| **Organisateur** | Créer et gérer les scrutins de son organisation |
+| **Auditeur** | Vérifier l'intégrité des scrutins |
+| **Électeur** | Voter dans les scrutins autorisés |
+
+#### Tableaux de bord
+- Suivi en temps réel de la participation (sans révéler les votes)
+- Gestion des organisations
+- Export de données
+
+### 6.8 Sécurité
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Protection contre les attaques** | Anti-DDoS, rate limiting, anti-replay |
+| **Chiffrement au repos et en transit** | Chiffrement des données stockées |
+| **Audit de sécurité** | Code auditable, pentests réguliers |
+| **RGPD** | Droit à l'oubli compatible avec l'immuabilité (données personnelles hors-chaîne) |
+
+---
+
+## 7. Règles de Scrutin
 
 | Règle | Détail |
 |-------|--------|
-| Type | Majorité simple à 1 tour |
+| Type | Majorité simple à 1 tour (MVP) |
 | Égalité | À définir (US 26) |
 | Durée | Au choix de l'organisateur |
 | Clôture auto | Quand tout le monde a votés OU fin du délai |
@@ -265,21 +309,21 @@ CREATE TABLE votes (
 
 ---
 
-## 7. Spécifications Blockchain (Étapes)
+## 8. Spécifications Blockchain
 
 ### Étape 1 : Vote stocké en clair (MVP)
 - Vote on-chain
 - Vérifiable par hash de transaction
+- NFT de droit de vote
 
 ### Étape 2 : Vote homomorphe (V2)
 - Chiffrement homomorphe
-- Décryptage collaboratif
+- Décryptage distribué (MPC)
+- Preuves ZKP
 
 ---
 
-## 8. Business Model
-
-### Opportunité
+## 9. Business Model
 
 **Loi française** : Les fédérations sportives doivent avoir **50% de participation minimum** aux scrutins, vérifiable sur blockchain.
 
@@ -287,14 +331,13 @@ CREATE TABLE votes (
 
 ---
 
-## 9. Prochaines Étapes
+## 10. Prochaines Étapes
 
-1. [ ] Valider les règles en cas d'égalité (US 26)
-2. [ ] Mapper les US sur le diagramme d'architecture
-3. [ ] POC technique
-4. [ ] Architecture technique détaillée
+1. [ ] Mapper les US sur le diagramme d'architecture
+2. [ ] POC technique
+3. [ ] Architecture technique détaillée
 
 ---
 
 *Document généré le 04-03-2026*
-*Version : 0.3*
+*Version : 0.4*
