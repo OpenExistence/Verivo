@@ -9,274 +9,257 @@ Créer une plateforme de vote électronique sécurisée permettant aux entrepris
 
 | Caractéristique | Description |
 |-----------------|-------------|
-| **Inviolabilité** | Aucun vote ne peut être modifié ou supprimé après émission |
+| **Inviolabilité** | Aucun vote ne peut être modifié ou supprimé après emission |
 | **Audibilité** | Tout électeur peut vérifier que son vote a été comptabilisé |
 | **Anonymat** | Impossible de relier un vote à un électeur spécifique |
 | **Accessibilité** | Interface simple, intuitive, accessible à tous |
-| **Anti-coercition** | Vote non réutilisable, imposible de prouver comment on a vote |
-| **Rapidité** | Résultats disponibles rapidement après la fin du scrutin |
 
 ---
 
 ## 2. Architecture Fonctionnelle
 
-### 2.1 Vue d'Ensemble
+### 2.1 Pages de l'Application
+
+1. **Page d'accueil** - Landing + connexion
+2. **Page d'inscription** - Création de compte + wallet
+3. **Page création de scrutin** - Paramétrage + sélection des votants
+4. **Page vote** - Vote pour les électeurs
+5. **Page consultation scrutin** - Résultats (v2)
+
+### 2.2 Flux Utilisateur
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                           UTILISATEURS                             │
-│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐       │
-│  │   Électeur │      │Organisateur │      │   Auditeur   │       │
-│  │  (Mobile)  │      │   (Web)     │      │  (Optionnel) │       │
-│  └──────┬──────┘      └──────┬──────┘      └──────┬──────┘       │
-│         │                    │                     │              │
-│         └────────────────────┼─────────────────────┘              │
-│                              ▼                                    │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                      BACKEND API                              │ │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │ │
-│  │  │Auth      │  │Scrutin   │  │Vote      │  │Results   │   │ │
-│  │  │Service   │  │Service   │  │Service   │  │Service   │   │ │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                              │                                    │
-│         ┌────────────────────┼────────────────────┐              │
-│         ▼                    ▼                    ▼              │
-│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐      │
-│  │   Wallet    │      │  Blockchain │      │   Storage   │      │
-│  │   Service   │      │  Network    │      │  (IPFS)     │      │
-│  └─────────────┘      └─────────────┘      └─────────────┘      │
-└──────────────────────────────────────────────────────────────────┘
+[Inscription] → [Création compte + Wallet]
+       ↓
+[Connexion] → [Dashboard]
+       ↓
+[Création scrutin] → [Sélection votants] → [Hash registre on-chain]
+       ↓
+[Invitation votants] → [Email]
+       ↓
+[Voting] → [Vote] → [Hash transaction envoyé au votant]
+       ↓
+[Clôture] → [Résultats]
 ```
-
-### 2.2 Trois Blocs Technologiques
-
-#### Bloc 1 : Blockchain & Backend
-
-**Objectif** : Garantir l'inviolabilité et l'audibilité
-
-**Technologies candidates** :
-- Blockchain : Ethereum L2, Polygon, StarkNet, zkSync, Avalanche
-- Smart Contracts : Solidity, Cairo
-- Cryptographie : ZKP (Zero-Knowledge Proof), MPC (Multi-Party Computation), Chiffrement Homomorphe
-
-**Fonctionnalités** :
-1. **Identification des votants**
-   - NFT quasi-soul-bound (transférable une fois sous conditions)
-   - Vérification KYC/AML
-
-2. **Anonymat du vote**
-   - Preuves à connaissance nulle (ZKP)
-   - Calcul multipartite sécurisé (MPC)
-   - Chiffrement homomorphe
-
-3. **Systèmes de scrutin**
-   - Vote uninominal (1, 2 tours)
-   - Vote plurinominal
-   - Jugement majoritaire
-   - Approval voting
-   - Score voting
-
-4. **Transactions invisibles**
-   - Gasless transactions
-   - Account abstraction
-
-#### Bloc 2 : Wallet Mobile
-
-**Objectif** : Interface grand public pour les électeurs
-
-**Technologies candidates** :
-- Framework : React Native, Flutter, Swift/Kotlin natif
-- Wallet : WalletConnect, RainbowKit, wagmi
-- Security : Secure Enclave (iOS), TEE (Android)
-
-**Fonctionnalités** :
-1. **Gestion de wallet**
-   - Wallet non-custodial
-   - Stockage sécurisé des clés (Secure Enclave)
-   - Recovery seed phrase
-
-2. **Parcours utilisateur**
-   - Vérification d'identité (KYC)
-   - Liste des scrutins accessibles
-   - Vote (sélection, confirmation)
-   - Consultation des résultats
-   - Audit de son propre vote
-
-3. **Notifications**
-   - Rappel de vote
-   - Résultats publiés
-
-#### Bloc 3 : Interface Organisateur (Web)
-
-**Objectif** : Outil de gestion des scrutins pour les organisations
-
-**Technologies candidates** :
-- Frontend : Vue.js, React, Next.js
-- Backend API : Node.js, Python, Go
-
-**Fonctionnalités** :
-1. **Authentification**
-   - Login par wallet mobile (WalletConnect)
-   - OAuth (optionnel)
-
-2. **Gestion des scrutins**
-   - Création de scrutin
-   - Paramétrage (type, dates, participants)
-   - Import des électeurs
-   - Définition des options de vote
-
-3. **Administration**
-   - Ouverture/fermeture du scrutin
-   - Compilation homomorphe
-   - Décryptage MPC
-
-4. **Résultats**
-   - Consultation en temps réel
-   - Export PDF/CSV
-   - Certificat de résultats
 
 ---
 
-## 3. Spécifications Techniques Détaillées
+## 3. Modèle de Données
 
-### 3.1 Smart Contract - Structure
+### 3.1 Tables
 
-```solidity
-// Pseudo-code structure Smart Contract
+```sql
+-- Utilisateurs
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    wallet_address VARCHAR(42) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-contract Verivo {
-    // Enregistrement des organisations
-    struct Organization {
-        address owner;
-        string name;
-        bool isActive;
-    }
-    
-    // Définition d'un scrutin
-    struct Scrutin {
-        uint256 id;
-        address organization;
-        string title;
-        uint8 votingSystem;  // 0: uninominal, 1: plurinominal, 2: judgment, etc.
-        uint256 startTime;
-        uint256 endTime;
-        bool isActive;
-        bytes32 merkleRoot;  // Racine de l'arbre de Merkle des voters
-    }
-    
-    // Vote encrypté
-    struct EncryptedVote {
-        bytes32 commitment;  // Commitment ZKP
-        bytes ciphertext;    // Vote encrypté
-        bytes proof;         // Preuve ZKP
-    }
-    
-    // Événements
-    event ScrutinCreated(uint256 indexed scrutinId);
-    event VoteCast(uint256 indexed scrutinId, bytes32 commitment);
-    event ScrutinClosed(uint256 indexed scrutinId);
-    event ResultsPublished(uint256 indexed scrutinId);
-}
+-- Associations / Organisations
+CREATE TABLE associations (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rôles
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    association_id INTEGER REFERENCES associations(id),
+    role VARCHAR(50) CHECK (role IN ('admin', 'organisateur', 'votant')),
+    UNIQUE(user_id, association_id)
+);
+
+-- Scrutins
+CREATE TABLE scrutins (
+    id SERIAL PRIMARY KEY,
+    association_id INTEGER REFERENCES associations(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'closed', 'finished')),
+    voting_system VARCHAR(50) DEFAULT 'majority',
+    registry_hash VARCHAR(66),  -- Hash du registre des votants on-chain
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Registre des votants par scrutin
+CREATE TABLE votants_scrutin (
+    id SERIAL PRIMARY KEY,
+    scrutin_id INTEGER REFERENCES scrutins(id),
+    user_id INTEGER REFERENCES users(id),
+    wallet_address VARCHAR(42),
+    email VARCHAR(255),
+    nft_hash VARCHAR(66),  -- Hash de la transaction NFT
+    has_voted BOOLEAN DEFAULT FALSE,
+    vote_hash VARCHAR(66),  -- Hash de la transaction de vote
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(scrutin_id, user_id)
+);
+
+-- Votes (étape 1 : en clair)
+CREATE TABLE votes (
+    id SERIAL PRIMARY KEY,
+    scrutin_id INTEGER REFERENCES scrutins(id),
+    user_id INTEGER REFERENCES users(id),
+    choice VARCHAR(255) NOT NULL,
+    transaction_hash VARCHAR(66),
+    voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(scrutin_id, user_id)
+);
 ```
 
-### 3.2 Protocole de Vote Anonyme
+### 3.2 Schéma Relationnel
 
 ```
-1. INSCRIPTION
-   Électeur → Wallet → Vérification identité → Mint NFT votant
-   
-2. CRÉATION SCRUTIN
-   Organisateur → Définit paramètres → Déploie smart contract
-   + Distribue Merkle tree des électeurs autorisés
-   
-3. VOTE
-   Électeur → Génère clé temporaire (rotation)
-   → Chiffre vote avec clé publique du scrutin
-   → Génère ZKP (vote valide, droit de vote)
-   → Soumet transaction avec commitment + proof
-   
-4. COMPILATION
-   Smart Contract → Vérifie ZKP
-   → Stocke commitment (pas le vote!)
-   → Met à jour compteur
-   
-5. DÉPOUILLEMENT
-   Organisateur → Initie MPC (N participants)
-   → Décryptage collaboratif
-   → Publication résultats + preuve de décryptage
-   
-6. AUDIT
-   Électeur → Vérifie commitment dans la chaîne
-   → Vérifie preuve ZKP
-   → Confirme que son vote est inclus
+┌─────────────┐       ┌──────────────┐       ┌─────────────┐
+│   users    │       │ associations │       │   scrutins  │
+├─────────────┤       ├──────────────┤       ├─────────────┤
+│ id          │       │ id           │       │ id          │
+│ email       │       │ name         │       │ title       │
+│ wallet_addr │◄──────│ created_at   │       │ start_date  │
+│ created_at  │       └──────────────┘       │ end_date    │
+└─────────────┘              │               │ status      │
+        │                    │               └──────┬──────┘
+        │                    │                      │
+        ▼                    ▼                      ▼
+┌─────────────────────────────────────────────────────────┐
+│                    votants_scrutin                      │
+├─────────────────────────────────────────────────────────┤
+│ scrutin_id │ user_id │ wallet │ nft_hash │ has_voted │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+                    ┌─────────┐
+                    │  votes  │
+                    ├─────────┤
+                    │ choice  │
+                    │ tx_hash │
+                    └─────────┘
 ```
-
-### 3.3 Comparatif Systèmes de Vote
-
-| Système | Avantages | Inconvénients |
-|---------|-----------|---------------|
-| Uninominal 1 tour | Simple, connu | Risque vote utile |
-| Uninominal 2 tours | Choix définitif | Durée |
-| Plurinominal | Multiples choix | Stratégie de vote |
-| Jugement majoritaire | Expression nuancée | Calcul complexe |
-| Approval | Simple | Pas de gradation |
-| Score | Expression riche | Manipulation possible |
 
 ---
 
-## 4. Périmètre MVP (À définir)
+## 4. Spécifications Fonctionnelles
 
-Pour respecter les contraintes de certification Alyra, un périmètre réduit est nécessaire.
+### 4.1 Inscription & Wallet
 
-### 4.1 Fonctionnalités MVP
+1. **Création de compte**
+   - Email + mot de passe
+   - Génération wallet (ou import)
 
-- [ ] Authentification wallet
-- [ ] Création de scrutin (type basique)
-- [ ] Vote simple (uninominal)
-- [ ] Résultats basiques
+2. **Association wallet**
+   - Wallet lié au compte utilisateur
+   - Stockage sécurisé
 
-### 4.2 Blockchain MVP
+### 4.2 Création de Scrutin
 
-- [ ] Déploiement sur testnet
-- [ ] Smart contract vote basique
-- [ ] Intégration WalletConnect
+1. **Paramétrage**
+   - Titre + description
+   - Date de début / fin
+   - Système de vote
+
+2. **Sélection des votants**
+   - Import liste emails / wallets
+   - OU sélection manuelle depuis la liste des membres
+
+3. **Publication**
+   - Hash du registre des votants
+   - Mint NFT pour chaque votant
+   - Envoi des invitations
+
+### 4.3 Processus de Vote
+
+1. **Accès**
+   - Seuls les personnes avec NFT peuvent voir le scrutin
+   - Lien dans l'email d'invitation
+
+2. **Vote**
+   - Sélection de l'option
+   - Confirmation
+   - Transaction on-chain
+
+3. **Confirmation**
+   - Hash de transaction envoyé au votant
+   - Lien vers block explorer
+   - Lien vers page de vérification
+
+### 4.4 Clôture & Résultats
+
+1. **Triggers de clôture**
+   - Durée écoulée
+   - OU 100% des votants ont voted
+
+2. **Résultats**
+   - Calcul automatique
+   - Publication sur la page
+
+### 4.5 Règles de Scrutin
+
+| Règle | Détail |
+|-------|--------|
+| Type | Majorité simple à 1 tour |
+| Égalité | À définir (reculer ? nouveau vote ?) |
+| Durée | Au choix de l'organisateur |
+| Clôture auto | Quand tout le monde a voted OU fin du délai |
+| Irrévocable | On ne peut pas modifier son vote |
 
 ---
 
-## 5. Risques et Contraintes
+## 5. Spécifications Blockchain (Étapes)
 
-### 5.1 Risques Techniques
+### Étape 1 : Vote stocké en clair
+- Vote on-chain
+- Vérifiable par hash de transaction
 
-1. **Complexité cryptographique**
-   - ZKP/MPC : expertise rare
-   - Chiffrement homomorphe : performant?
+### Étape 2 : Vote homomorphe
+- Chiffrement homomorphe
+- Compteur sans révéler les votes
+- Décryptage collaboratif
 
-2. **Scalabilité**
-   - Thousands d'utilisateurs simultanés
-   - Coût gas sur L1
-
-3. **UX**
-   - Complexité technique cachée à l'utilisateur
-   - Onboarding non-crypto
-
-### 5.2 Contraintes Réglementaires
-
-- Certification needed?
-- RGPD compatible?
-- LOI n° 2016-1321 pour les élections professionnelles
+### Éléments on-chain
+- Hash du registre des votants
+- NFT de droit de vote (quasi soul-bound)
+- Transactions de vote
+- Résultats hashés
 
 ---
 
-## 6. Prochaines Étapes
+## 6. Vocabulaire
 
-1. [ ] Valider le périmètre MVP avec l'équipe
-2. [ ] Choisir la blockchain
-3. [ ] POC technique (vote simple sur testnet)
-4. [ ] Définition architecture détaillée
-5. [ ] Répartition des tâches
+À définir et mettre à disposition des utilisateurs :
+
+- Scrutin / Vote / Élection
+- Votant / Électeur / Participant
+- Organisateur / Administrateur
+- Bulletins / Choix / Option
+- Majorité / Quorum
+- etc.
+
+---
+
+## 7. Business Model
+
+### Opportunité
+
+**Loi française** : Les fédérations sportives doivent avoir **50% de participation minimum** aux scrutins, vérifiable sur blockchain.
+
+= **Grosse demande potentielle**
+
+---
+
+## 8. Prochaines Étapes
+
+1. [ ] Valider les règles en cas d'égalité
+2. [ ] Définir le vocabulaire
+3. [ ] POC technique
+4. [ ] Architecture technique détaillée
 
 ---
 
 *Document généré le 04-03-2026*
-*Version : 0.1*
+*Version : 0.2*
