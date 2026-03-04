@@ -113,50 +113,109 @@ CREATE TABLE votes (
 );
 ```
 
-### 3.2 Schéma Relationnel
+---
 
-```
-┌─────────────┐       ┌──────────────┐       ┌─────────────┐
-│   users    │       │ associations │       │   scrutins  │
-├─────────────┤       ├──────────────┤       ├─────────────┤
-│ id          │       │ id           │       │ id          │
-│ email       │       │ name         │       │ title       │
-│ wallet_addr │◄──────│ created_at   │       │ start_date  │
-│ created_at  │       └──────────────┘       │ end_date    │
-└─────────────┘              │               │ status      │
-        │                    │               └──────┬──────┘
-        │                    │                      │
-        ▼                    ▼                      ▼
-┌─────────────────────────────────────────────────────────┐
-│                    votants_scrutin                      │
-├─────────────────────────────────────────────────────────┤
-│ scrutin_id │ user_id │ wallet │ nft_hash │ has_voted │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-                    ┌─────────┐
-                    │  votes  │
-                    ├─────────┤
-                    │ choice  │
-                    │ tx_hash │
-                    └─────────┘
-```
+## 4. Matrice de Priorisation - User Stories
+
+### User Stories
+
+| # | Persona | Titre | Détail | Priorité | MVP |
+|---|---------|-------|--------|----------|-----|
+| 01 | Utilisateur | Inscription utilisateur | Créer un compte avec génération automatique d'un wallet associé | Haute | Oui |
+| 02 | Organisateur | Inscription organisateur | S'inscrire afin de pouvoir créer et administrer des votes | Haute | Oui |
+| 03 | Votant | Inscription votant | S'inscrire afin de participer aux votes autorisés | Haute | Oui |
+| 04 | Organisateur | Créer vote uninominal à deux tours | Créer un scrutin uninominal à deux tours | Moyenne | Non |
+| 05 | Votant | Voter uninominal à deux tours | Participer à un scrutin à deux tours | Moyenne | Non |
+| 06 | Votant | Voter pour/contre | Voter pour ou contre une résolution en Assemblée Générale | Haute | Oui |
+| 07 | Organisateur | Créer vote pour/contre | Créer un vote pour ou contre une résolution | Haute | Oui |
+| 08 | Organisateur | Créer vote uninominal 1 tour | Créer un scrutin majoritaire à un tour | Haute | Oui |
+| 09 | Votant | Voter uninominal 1 tour | Voter pour un candidat | Haute | Oui |
+| 10 | Organisateur | Score participation | Visualiser et valoriser la participation des votants | Moyenne | Oui |
+| 11 | Organisateur | Consulter résultats | Consulter les résultats détaillés du vote | Haute | Oui |
+| 12 | Votant | Consulter résultats | Consulter le résultat du vote | Haute | Oui |
+| 13 | Auditeur | Consulter résultats avec preuves | Vérifier l'intégrité et la conformité du vote | Moyenne | Oui |
+| 14 | Organisateur | Publier résultats | Publier officiellement les résultats du vote | Haute | Oui |
+| 15 | Organisateur | Sélectionner votants | Définir la liste des votants autorisés | Haute | Oui |
+| 16 | Système | Hasher registre votants | Générer un hash du registre et l'inscrire sur la blockchain | Haute | Oui |
+| 17 | Système | Émettre NFT droit de vote | Émettre un NFT par votant pour matérialiser son droit de vote | Haute | Oui |
+| 18 | Votant | Recevoir invitation | Recevoir une notification d'ouverture du vote | Haute | Oui |
+| 19 | Votant | Vote unique | Ne pouvoir voter qu'une seule fois et empêcher toute modification | Haute | Oui |
+| 20 | Système | Preuve de vote | Envoyer le hash de transaction et le lien explorateur | Moyenne | Oui |
+| 21 | Système | Clôture automatique | Clôturer le vote automatiquement à échéance ou 100% participation | Haute | Oui |
+| 22 | Organisateur | Définir durée | Paramétrer date de début et date de fin | Haute | Oui |
+| 23 | Organisateur | Visualiser taux participation | Voir en temps réel le taux de participation | Haute | Oui |
+| 24 | Système | Vérifier quorum 50% | Calcul automatique du respect du seuil réglementaire | Haute | Oui |
+| 25 | Auditeur | Vérifier intégrité registre | Comparer le hash en base avec celui inscrit sur la blockchain | Moyenne | Oui |
+| 26 | Organisateur | Gérer égalité | Définir la règle applicable en cas d'égalité | Moyenne | Non |
+| 28 | Système | Vote homomorphe | Chiffrement des votes pour dépouillement sécurisé | Basse | Non |
+| 29 | Organisateur | Dépouillement sécurisé | Déclencher le calcul cryptographique du résultat | Basse | Non |
 
 ---
 
-## 4. Spécifications Fonctionnelles
+## 5. EPICs
 
-### 4.1 Inscription & Wallet
+### EPIC 1 – Authentification & Wallet
+**US :** 01, 02, 03
+- Inscription utilisateur avec génération wallet
+- Inscription organisateur
+- Inscription votant
+
+### EPIC 2 – Paramétrage & Création du vote
+**US :** 07, 08, 15, 22
+- Créer vote pour/contre
+- Créer vote uninominal 1 tour
+- Sélectionner votants
+- Définir durée
+
+### EPIC 3 – Sécurisation Blockchain & NFT (MVP)
+**US :** 16, 17, 19, 20, 25
+- Hasher registre votants (on-chain)
+- Émettre NFT droit de vote
+- Vote unique (irrevocable)
+- Preuve de vote (hash transaction)
+- Vérifier intégrité registre
+
+### EPIC 4 – Processus de vote
+**US :** 06, 09, 18, 21
+- Voter pour/contre
+- Voter uninominal 1 tour
+- Recevoir invitation
+- Clôture automatique
+
+### EPIC 5 – Résultats & Conformité réglementaire
+**US :** 10, 11, 12, 14, 23, 24
+- Score participation
+- Consulter résultats (organisateur)
+- Consulter résultats (votant)
+- Publier résultats
+- Visualiser taux participation
+- Vérifier quorum 50%
+
+### EPIC 6 – Scrutins avancés
+**US :** 04, 05, 26
+- Créer vote uninominal à deux tours
+- Voter uninominal à deux tours
+- Gérer égalité
+
+### EPIC 7 – Vote confidentiel avancé (V2)
+**US :** 28, 29
+- Vote homomorphe
+- Dépouillement sécurisé
+
+---
+
+## 6. Spécifications Fonctionnelles
+
+### 6.1 Inscription & Wallet
 
 1. **Création de compte**
    - Email + mot de passe
-   - Génération wallet (ou import)
+   - Génération wallet automatique
 
 2. **Association wallet**
    - Wallet lié au compte utilisateur
-   - Stockage sécurisé
 
-### 4.2 Création de Scrutin
+### 6.2 Création de Scrutin
 
 1. **Paramétrage**
    - Titre + description
@@ -165,84 +224,60 @@ CREATE TABLE votes (
 
 2. **Sélection des votants**
    - Import liste emails / wallets
-   - OU sélection manuelle depuis la liste des membres
+   - OU sélection manuelle
 
 3. **Publication**
-   - Hash du registre des votants
+   - Hash du registre des votants on-chain
    - Mint NFT pour chaque votant
    - Envoi des invitations
 
-### 4.3 Processus de Vote
+### 6.3 Processus de Vote
 
 1. **Accès**
    - Seuls les personnes avec NFT peuvent voir le scrutin
-   - Lien dans l'email d'invitation
 
 2. **Vote**
    - Sélection de l'option
-   - Confirmation
    - Transaction on-chain
 
 3. **Confirmation**
    - Hash de transaction envoyé au votant
    - Lien vers block explorer
-   - Lien vers page de vérification
 
-### 4.4 Clôture & Résultats
+### 6.4 Clôture & Résultats
 
 1. **Triggers de clôture**
    - Durée écoulée
-   - OU 100% des votants ont voted
+   - OU 100% des votants ont votés
 
 2. **Résultats**
-   - Calcul automatique
    - Publication sur la page
 
-### 4.5 Règles de Scrutin
+### 6.5 Règles de Scrutin
 
 | Règle | Détail |
 |-------|--------|
 | Type | Majorité simple à 1 tour |
-| Égalité | À définir (reculer ? nouveau vote ?) |
+| Égalité | À définir (US 26) |
 | Durée | Au choix de l'organisateur |
-| Clôture auto | Quand tout le monde a voted OU fin du délai |
+| Clôture auto | Quand tout le monde a votés OU fin du délai |
 | Irrévocable | On ne peut pas modifier son vote |
 
 ---
 
-## 5. Spécifications Blockchain (Étapes)
+## 7. Spécifications Blockchain (Étapes)
 
-### Étape 1 : Vote stocké en clair
+### Étape 1 : Vote stocké en clair (MVP)
 - Vote on-chain
 - Vérifiable par hash de transaction
 
-### Étape 2 : Vote homomorphe
+### Étape 2 : Vote homomorphe (V2)
 - Chiffrement homomorphe
-- Compteur sans révéler les votes
 - Décryptage collaboratif
 
-### Éléments on-chain
-- Hash du registre des votants
-- NFT de droit de vote (quasi soul-bound)
-- Transactions de vote
-- Résultats hashés
-
 ---
 
-## 6. Vocabulaire
-
-À définir et mettre à disposition des utilisateurs :
-
-- Scrutin / Vote / Élection
-- Votant / Électeur / Participant
-- Organisateur / Administrateur
-- Bulletins / Choix / Option
-- Majorité / Quorum
-- etc.
-
----
-
-## 7. Business Model
+## 8. Business Model
 
 ### Opportunité
 
@@ -252,14 +287,14 @@ CREATE TABLE votes (
 
 ---
 
-## 8. Prochaines Étapes
+## 9. Prochaines Étapes
 
-1. [ ] Valider les règles en cas d'égalité
-2. [ ] Définir le vocabulaire
+1. [ ] Valider les règles en cas d'égalité (US 26)
+2. [ ] Mapper les US sur le diagramme d'architecture
 3. [ ] POC technique
 4. [ ] Architecture technique détaillée
 
 ---
 
 *Document généré le 04-03-2026*
-*Version : 0.2*
+*Version : 0.3*
