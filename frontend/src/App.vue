@@ -2,8 +2,8 @@
   <div class="app">
     <header class="header">
       <div class="logo">
-        <img src="/logo.jpg" alt="DAO Voting" />
-        <span>DAO Voting</span>
+        <img src="/logo.jpg" alt="Verivo" />
+        <span>Verivo</span>
       </div>
       <nav class="nav">
         <router-link to="/">Propositions</router-link>
@@ -23,7 +23,7 @@
     </main>
 
     <footer class="footer">
-      <p>DAO Voting © 2026</p>
+      <p>Verivo © 2026</p>
     </footer>
   </div>
 </template>

@@ -1,4 +1,4 @@
-# DAO Voting MVP
+# Verivo
 
 MVP pour un système de vote basé sur NFT (ERC-721) sur Sepolia.
 
