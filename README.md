@@ -1,53 +1,122 @@
 # Verivo
 
-MVP pour un système de vote basé sur NFT (ERC-721) sur Sepolia.
+Système de vote décentralisé sécurisé sur blockchain Ethereum.
 
-## Stack
+## Description
 
-- **Blockchain:** Solidity (ERC-721), réseau Sepolia
-- **Backend:** FastAPI + SQLite
-- **Frontend:** Vue 3 + Vite
-- **Testnet:** Sepolia
+Verivo est une plateforme de vote DAO où chaque vote est enregistré sur la blockchain pour garantir transparence et intégrité.
 
-## Structure
+## Fonctionnalités
 
-```
-dao-voting-mvp/
-├── contracts/         # Smart contracts Solidity
-├── backend/           # API REST Python
-├── frontend/          # Vue 3 app
-└── tests/             # Tests
-```
+- 🔐 Authentification utilisateur (email/mot de passe)
+- 🔒 Votes sécurisés sur blockchain
+- ⚖️ Multiple types de vote (majorité simple, qualifiée, unanimité)
+- 👥 Gestion des votants par proposition
+- 📊 Suivi des résultats en temps réel
 
 ## Installation
+
+### Prérequis
+
+- Node.js 18+
+- Python 3.9+
+- SQLite
 
 ### Backend
 
 ```bash
 cd backend
+
+# Créer l'environnement virtuel
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate     # Windows
+
+# Installer les dépendances
 pip install -r requirements.txt
-uvicorn main:app --reload
+
+# Lancer le serveur
+python main.py
 ```
+
+Le backend sera accessible sur `http://localhost:8000`
 
 ### Frontend
 
 ```bash
 cd frontend
+
+# Installer les dépendances
 npm install
+
+# Lancer en développement
 npm run dev
 ```
 
-## Variables d'environnement
+Le frontend sera accessible sur `http://localhost:5173`
 
-Copiez `.env.example` en `.env` et configurez:
+## Configuration
 
-- `VITE_API_URL` - URL du backend
-- `VITE_CONTRACT_ADDRESS` - Adresse du contrat déployé
-- `VITE_INFURA_PROJECT_ID` - ID projet Infura
+### Backend (.env)
 
-## Fonctionnalités MVP
+```env
+# Pas de configuration nécessaire pour le développement local
+```
 
-1. **Claim NFT** - Mint du NFT "droit de vote"
-2. **Propositions** - Liste et création de propositions
-3. **Vote** - Vote sur les propositions (via NFT)
-4. **Execution** - Exécution des propositions validées
+### Frontend (.env)
+
+Créez un fichier `.env` dans `frontend/`:
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+## API Endpoints
+
+### Auth
+
+- `POST /api/register` - Inscription
+- `POST /api/login` - Connexion
+- `GET /api/me` - Profil utilisateur
+
+### Propositions
+
+- `GET /api/proposals` - Liste des propositions
+- `POST /api/proposals` - Créer une proposition
+- `POST /api/proposals/{id}/start` - Ouvrir le vote
+- `POST /api/provotes/{id}/vote` - Voter
+
+### Types de vote
+
+- `GET /api/vote-types` - Liste des types de vote
+
+## Blockchain
+
+Les contrats intelligents sont développés en Solidity et déployés sur le réseau Sepolia (testnet).
+
+### Déploiement
+
+```bash
+# Configurer les variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos clés
+
+# Compiler les contrats
+npx hardhat compile
+
+# Déployer sur Sepolia
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+## Tech Stack
+
+- **Frontend**: Vue 3 + Vite
+- **Backend**: FastAPI + Python
+- **Database**: SQLite
+- **Blockchain**: Solidity + Hardhat
+- **Réseau**: Ethereum Sepolia (testnet)
+
+## Licence
+
+MIT
