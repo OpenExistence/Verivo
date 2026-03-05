@@ -1,65 +1,75 @@
 <template>
   <div class="app">
     <header class="header">
-      <div class="logo">
-        <img src="/logo.jpg" alt="Verivo" />
-        <span>Verivo</span>
-      </div>
-      <nav class="nav">
-        <router-link to="/">Propositions</router-link>
-        <router-link to="/about">Comment ça marche</router-link>
-        <router-link to="/admin">Admin</router-link>
-        <button v-if="!account" @click="connectWallet" class="btn-connect">
-          Connect Wallet
-        </button>
-        <div v-else class="wallet-info">
-          {{ shortAddress(account) }}
+      <div class="header-content">
+        <router-link to="/" class="logo">
+          <img src="/logo.jpg" alt="Verivo" />
+          <span>Verivo</span>
+        </router-link>
+        
+        <nav class="nav">
+          <router-link to="/">Accueil</router-link>
+          <router-link to="/proposals">Propositions</router-link>
+          <router-link to="/about">À propos</router-link>
+        </nav>
+        
+        <div class="auth-buttons" v-if="!user">
+          <router-link to="/login" class="btn btn-ghost">Connexion</router-link>
+          <router-link to="/register" class="btn btn-primary">Inscription</router-link>
         </div>
-      </nav>
+        
+        <div class="user-menu" v-else>
+          <span class="user-name">{{ user.name || user.email }}</span>
+          <router-link v-if="user.role === 'admin'" to="/admin" class="btn btn-ghost">Admin</router-link>
+          <button @click="logout" class="btn btn-ghost">Déconnexion</button>
+        </div>
+      </div>
     </header>
 
     <main class="main">
-      <router-view />
+      <router-view @auth="onAuth" />
     </main>
 
     <footer class="footer">
-      <p>Verivo © 2026</p>
+      <p>© 2026 Verivo - Système de vote décentralisé</p>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, provide } from 'vue'
-import { ethers } from 'ethers'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
-const account = ref(null)
-provide('account', account)
+const router = useRouter()
+const user = ref(null)
 
-const connectWallet = async () => {
-  if (window.ethereum) {
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
-      const accounts = await provider.send("eth_requestAccounts", [])
-      account.value = accounts[0]
-    } catch (err) {
-      console.error("Erreur connexion:", err)
-    }
-  } else {
-    alert("Veuillez installer MetaMask!")
-  }
+const onAuth = () => {
+  checkAuth()
 }
 
-const shortAddress = (addr) => {
-  return addr.slice(0, 6) + '...' + addr.slice(-4)
-}
-
-onMounted(() => {
-  if (window.ethereum) {
-    window.ethereum.on('accountsChanged', (accounts) => {
-      account.value = accounts[0] || null
+const checkAuth = async () => {
+  const token = localStorage.getItem('verivo_token')
+  if (!token) return
+  
+  try {
+    const res = await fetch('http://localhost:8000/api/me', {
+      headers: { 'Authorization': token }
     })
+    if (res.ok) {
+      user.value = await res.json()
+    }
+  } catch (e) {
+    console.error(e)
   }
-})
+}
+
+const logout = () => {
+  localStorage.removeItem('verivo_token')
+  user.value = null
+  router.push('/')
+}
+
+onMounted(checkAuth)
 </script>
 
 <style>
@@ -73,10 +83,13 @@ onMounted(() => {
   --primary: #0a0a0a;
   --secondary: #141414;
   --accent: #3498db;
+  --accent-hover: #2980b9;
   --text: #f5f5dc;
   --text-muted: #a8a8a8;
   --card-bg: #1a1a1a;
   --success: #4ade80;
+  --error: #ff6b6b;
+  --border: rgba(255,255,255,0.1);
 }
 
 body {
@@ -93,34 +106,43 @@ body {
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
   background: var(--secondary);
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
 }
 
 .logo {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  text-decoration: none;
 }
 
 .logo img {
-  height: 40px;
+  height: 36px;
   border-radius: 8px;
 }
 
 .logo span {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--accent);
 }
 
 .nav {
   display: flex;
-  align-items: center;
   gap: 1.5rem;
 }
 
@@ -136,60 +158,75 @@ body {
   color: var(--accent);
 }
 
-.btn-connect {
-  background: var(--accent);
-  color: white;
-  border: none;
+.auth-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-name {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.btn {
   padding: 0.5rem 1rem;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 500;
+  text-decoration: none;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: transform 0.2s, opacity 0.2s;
+  border: none;
+  transition: all 0.2s;
 }
 
-.btn-connect:hover {
-  transform: translateY(-1px);
-  opacity: 0.9;
+.btn-primary {
+  background: var(--accent);
+  color: #0a0a0a;
 }
 
-.wallet-info {
-  background: var(--card-bg);
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 0.875rem;
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.1);
 }
 
 .main {
   flex: 1;
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
+  padding: 0;
 }
 
 .footer {
   text-align: center;
-  padding: 1.5rem;
+  padding: 2rem;
   color: var(--text-muted);
   font-size: 0.875rem;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid var(--border);
 }
 
 @media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    gap: 1rem;
+  .header-content {
+    flex-wrap: wrap;
     padding: 1rem;
   }
   
   .nav {
-    flex-wrap: wrap;
+    order: 3;
+    width: 100%;
     justify-content: center;
-  }
-  
-  .main {
-    padding: 1rem;
+    margin-top: 1rem;
   }
 }
 </style>

@@ -1,17 +1,30 @@
 """
-DAO Voting Backend - FastAPI + SQLite
-Schéma complet avec persons, roles, types de votes, votes
+Verivo Backend - FastAPI + SQLite
+With authentication
 """
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from enum import Enum
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
+import secrets
+from functools import wraps
 
-app = FastAPI(title="DAO Voting API")
+app = FastAPI(title="Verivo API", description="Système de vote DAO")
 
-DB_PATH = "dao_voting.db"
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DB_PATH = "verivo.db"
 
 # === ENUMS ===
 class RoleEnum(str, Enum):
@@ -31,80 +44,37 @@ class VoteTypeEnum(str, Enum):
     UNANIMOUS = "unanimous"
     BLOC_VOTE = "bloc_vote"
 
-# === MODELS PYDANTIC ===
-
-class PersonCreate(BaseModel):
-    address: str
-    name: Optional[str] = None
-    email: Optional[str] = None
-    role: RoleEnum = RoleEnum.VOTER
-
-class PersonResponse(BaseModel):
-    id: int
-    address: str
-    name: Optional[str]
-    email: Optional[str]
-    role: str
-    created_at: str
-
-class VoteTypeCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    required_percentage: int = 50  # Pour majority qualifié
-
-class VoteTypeResponse(BaseModel):
-    id: int
-    name: str
-    description: Optional[str]
-    required_percentage: int
-
-class ProposalCreate(BaseModel):
-    title: str
-    description: str
-    vote_type: VoteTypeEnum = VoteTypeEnum.SIMPLE_MAJORITY
-    voters: Optional[List[str]] = []
-
-class ProposalResponse(BaseModel):
-    id: int
-    title: str
-    description: str
-    vote_type: str
-    vote_count: int
-    status: str
-    voting_open: bool
-    created_at: str
-
-class VoteRequest(BaseModel):
-    voter_address: str
-
-class VoteResponse(BaseModel):
-    id: int
-    proposal_id: int
-    voter_address: str
-    vote: bool
-    status: str
-    voted_at: str
-
-# === DATABASE INIT ===
+# === DATABASE ===
 
 def init_db():
-    """Initialize database with full schema"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Persons / Users
+    # Users table
     c.execute("""
-        CREATE TABLE IF NOT EXISTS persons (
+        CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            address TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
             name TEXT,
-            email TEXT,
             role TEXT DEFAULT 'voter',
+            wallet_address TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     
-    # Vote Types
+    # Sessions table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    
+    # Vote types
     c.execute("""
         CREATE TABLE IF NOT EXISTS vote_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,7 +84,6 @@ def init_db():
         )
     """)
     
-    # Insert default vote types
     default_types = [
         ('simple_majority', 'Majorité simple (50% + 1)', 50),
         ('qualified_majority', 'Majorité qualifié (66%+)', 66),
@@ -136,20 +105,23 @@ def init_db():
             vote_count INTEGER DEFAULT 0,
             status TEXT DEFAULT 'pending',
             voting_open BOOLEAN DEFAULT FALSE,
+            created_by INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (vote_type_id) REFERENCES vote_types(id)
+            FOREIGN KEY (vote_type_id) REFERENCES vote_types(id),
+            FOREIGN KEY (created_by) REFERENCES users(id)
         )
     """)
     
-    # Proposal Voters (who can vote)
+    # Proposal voters
     c.execute("""
         CREATE TABLE IF NOT EXISTS proposal_voters (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             proposal_id INTEGER NOT NULL,
-            voter_address TEXT NOT NULL,
+            voter_id INTEGER NOT NULL,
             has_voted BOOLEAN DEFAULT FALSE,
             FOREIGN KEY (proposal_id) REFERENCES proposals(id),
-            UNIQUE(proposal_id, voter_address)
+            FOREIGN KEY (voter_id) REFERENCES users(id),
+            UNIQUE(proposal_id, voter_id)
         )
     """)
     
@@ -158,17 +130,94 @@ def init_db():
         CREATE TABLE IF NOT EXISTS votes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             proposal_id INTEGER NOT NULL,
-            voter_address TEXT NOT NULL,
+            voter_id INTEGER NOT NULL,
             vote BOOLEAN NOT NULL,
-            status TEXT DEFAULT 'approved',
             voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (proposal_id) REFERENCES proposals(id),
-            UNIQUE(proposal_id, voter_address)
+            FOREIGN KEY (voter_id) REFERENCES users(id),
+            UNIQUE(proposal_id, voter_id)
         )
     """)
     
     conn.commit()
     conn.close()
+
+# === MODELS ===
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
+    wallet_address: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    name: Optional[str]
+    role: str
+    wallet_address: Optional[str]
+    created_at: str
+
+class TokenResponse(BaseModel):
+    token: str
+    user: UserResponse
+
+class VoteTypeResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    required_percentage: int
+
+class ProposalCreate(BaseModel):
+    title: str
+    description: str
+    vote_type: VoteTypeEnum = VoteTypeEnum.SIMPLE_MAJORITY
+
+class ProposalResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    vote_type: str
+    vote_count: int
+    status: str
+    voting_open: bool
+    created_at: str
+
+class VoteRequest(BaseModel):
+    vote: bool
+
+# === AUTH HELPERS ===
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_token() -> str:
+    return secrets.token_urlsafe(32)
+
+def get_user_from_token(token: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT u.* FROM users u
+        JOIN sessions s ON u.id = s.user_id
+        WHERE s.token = ? AND s.expires_at > datetime('now')
+    """, (token,))
+    user = c.fetchone()
+    conn.close()
+    return dict(user) if user else None
+
+def require_auth(token: str = None):
+    if not token:
+        raise HTTPException(status_code=401, detail="Non connecté")
+    user = get_user_from_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session expirée")
+    return user
 
 # === ROUTES ===
 
@@ -180,48 +229,118 @@ def startup():
 def health_check():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-# === PERSONS ===
+# === AUTH ===
 
-@app.get("/persons", response_model=List[PersonResponse])
-def get_persons():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM persons ORDER BY id DESC")
-    rows = c.fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
-
-@app.post("/persons", response_model=PersonResponse)
-def create_person(person: PersonCreate):
+@app.post("/api/register", response_model=TokenResponse)
+def register(user: UserCreate):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(
-        "INSERT INTO persons (address, name, email, role) VALUES (?, ?, ?, ?)",
-        (person.address, person.name, person.email, person.role)
-    )
-    person_id = c.lastrowid
+    
+    # Check if email exists
+    c.execute("SELECT id FROM users WHERE email = ?", (user.email,))
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="Email déjà utilisé")
+    
+    # Create user
+    c.execute("""
+        INSERT INTO users (email, password_hash, name, wallet_address)
+        VALUES (?, ?, ?, ?)
+    """, (user.email, hash_password(user.password), user.name, user.wallet_address))
+    
+    user_id = c.lastrowid
+    
+    # Create session
+    token = generate_token()
+    expires = datetime.now() + timedelta(days=7)
+    c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+              (user_id, token, expires))
+    
     conn.commit()
-    c.execute("SELECT * FROM persons WHERE id = ?", (person_id,))
+    
+    c.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     row = c.fetchone()
     conn.close()
-    return dict(row)
+    
+    user_data = dict(row)
+    return {
+        "token": token,
+        "user": {
+            "id": user_data["id"],
+            "email": user_data["email"],
+            "name": user_data["name"],
+            "role": user_data["role"],
+            "wallet_address": user_data["wallet_address"],
+            "created_at": user_data["created_at"]
+        }
+    }
 
-@app.get("/persons/{address}", response_model=PersonResponse)
-def get_person(address: str):
+@app.post("/api/login", response_model=TokenResponse)
+def login(credentials: UserLogin):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM persons WHERE address = ?", (address,))
-    row = c.fetchone()
+    
+    c.execute("SELECT * FROM users WHERE email = ?", (credentials.email,))
+    user = c.fetchone()
+    
+    if not user or user["password_hash"] != hash_password(credentials.password):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+    
+    user_id = user["id"]
+    
+    # Create session
+    token = generate_token()
+    expires = datetime.now() + timedelta(days=7)
+    c.execute("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+              (user_id, token, expires))
+    
+    conn.commit()
     conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Person not found")
-    return dict(row)
+    
+    return {
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "role": user["role"],
+            "wallet_address": user["wallet_address"],
+            "created_at": user["created_at"]
+        }
+    }
+
+@app.post("/api/logout")
+def logout(token: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM sessions WHERE token = ?", (token,))
+    conn.commit()
+    conn.close()
+    return {"status": "logged_out"}
+
+@app.get("/api/me", response_model=UserResponse)
+def get_me(authorization: str = None):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Non connecté")
+    
+    user = get_user_from_token(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session invalide")
+    
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "wallet_address": user["wallet_address"],
+        "created_at": user["created_at"]
+    }
 
 # === VOTE TYPES ===
 
-@app.get("/vote-types", response_model=List[VoteTypeResponse])
+@app.get("/api/vote-types", response_model=List[VoteTypeResponse])
 def get_vote_types():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -231,24 +350,9 @@ def get_vote_types():
     conn.close()
     return [dict(row) for row in rows]
 
-@app.post("/vote-types", response_model=VoteTypeResponse)
-def create_vote_type(vote_type: VoteTypeCreate):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO vote_types (name, description, required_percentage) VALUES (?, ?, ?)",
-        (vote_type.name, vote_type.description, vote_type.required_percentage)
-    )
-    vt_id = c.lastrowid
-    conn.commit()
-    c.execute("SELECT * FROM vote_types WHERE id = ?", (vt_id,))
-    row = c.fetchone()
-    conn.close()
-    return dict(row)
-
 # === PROPOSALS ===
 
-@app.get("/proposals", response_model=List[ProposalResponse])
+@app.get("/api/proposals", response_model=List[ProposalResponse])
 def get_proposals():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -275,28 +379,29 @@ def get_proposals():
         for row in rows
     ]
 
-@app.post("/proposals", response_model=ProposalResponse)
-def create_proposal(proposal: ProposalCreate):
+@app.post("/api/proposals", response_model=ProposalResponse)
+def create_proposal(proposal: ProposalCreate, authorization: str = None):
+    user = require_auth(authorization)
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Get vote_type_id
     c.execute("SELECT id FROM vote_types WHERE name = ?", (proposal.vote_type,))
     vt = c.fetchone()
     vote_type_id = vt[0] if vt else 1
     
-    c.execute(
-        "INSERT INTO proposals (title, description, vote_type_id) VALUES (?, ?, ?)",
-        (proposal.title, proposal.description, vote_type_id)
-    )
+    c.execute("""
+        INSERT INTO proposals (title, description, vote_type_id, created_by)
+        VALUES (?, ?, ?, ?)
+    """, (proposal.title, proposal.description, vote_type_id, user["id"]))
+    
     proposal_id = c.lastrowid
     
-    # Add voters
-    for voter in (proposal.voters or []):
-        c.execute(
-            "INSERT OR IGNORE INTO proposal_voters (proposal_id, voter_address) VALUES (?, ?)",
-            (proposal_id, voter)
-        )
+    # Add creator as voter
+    c.execute("""
+        INSERT INTO proposal_voters (proposal_id, voter_id)
+        VALUES (?, ?)
+    """, (proposal_id, user["id"]))
     
     conn.commit()
     conn.close()
@@ -312,7 +417,7 @@ def create_proposal(proposal: ProposalCreate):
         "created_at": datetime.now().isoformat()
     }
 
-@app.get("/proposals/{proposal_id}", response_model=ProposalResponse)
+@app.get("/api/proposals/{proposal_id}", response_model=ProposalResponse)
 def get_proposal(proposal_id: int):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -340,21 +445,27 @@ def get_proposal(proposal_id: int):
         "created_at": row["created_at"]
     }
 
-@app.post("/proposals/{proposal_id}/start")
-def start_voting(proposal_id: int):
+@app.post("/api/proposals/{proposal_id}/start")
+def start_voting(proposal_id: int, authorization: str = None):
+    user = require_auth(authorization)
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    c.execute("SELECT voting_open, status FROM proposals WHERE id = ?", (proposal_id,))
-    row = c.fetchone()
+    c.execute("SELECT voting_open, status, created_by FROM proposals WHERE id = ?", (proposal_id,))
+    prop = c.fetchone()
     
-    if not row:
+    if not prop:
         conn.close()
         raise HTTPException(status_code=404, detail="Proposal not found")
     
-    if row[0]:
+    if prop[0]:
         conn.close()
         raise HTTPException(status_code=400, detail="Voting already open")
+    
+    if user["role"] != "admin":
+        conn.close()
+        raise HTTPException(status_code=403, detail="Only admins can start voting")
     
     c.execute("UPDATE proposals SET voting_open = TRUE WHERE id = ?", (proposal_id,))
     conn.commit()
@@ -362,12 +473,13 @@ def start_voting(proposal_id: int):
     
     return {"status": "voting_open", "proposal_id": proposal_id}
 
-@app.post("/proposals/{proposal_id}/vote")
-def vote_proposal(proposal_id: int, vote: VoteRequest):
+@app.post("/api/proposals/{proposal_id}/vote")
+def vote_proposal(proposal_id: int, vote: VoteRequest, authorization: str = None):
+    user = require_auth(authorization)
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Check proposal
     c.execute("SELECT voting_open, status FROM proposals WHERE id = ?", (proposal_id,))
     prop = c.fetchone()
     
@@ -379,54 +491,54 @@ def vote_proposal(proposal_id: int, vote: VoteRequest):
         conn.close()
         raise HTTPException(status_code=400, detail="Voting not open")
     
-    # Check voter is allowed
-    c.execute(
-        "SELECT has_voted FROM proposal_voters WHERE proposal_id = ? AND voter_address = ?",
-        (proposal_id, vote.voter_address)
-    )
+    # Check if user is voter
+    c.execute("""
+        SELECT has_voted FROM proposal_voters 
+        WHERE proposal_id = ? AND voter_id = ?
+    """, (proposal_id, user["id"]))
     voter = c.fetchone()
     
-    if not voter or voter[0]:
+    if not voter:
         conn.close()
-        raise HTTPException(status_code=400, detail="Cannot vote")
+        raise HTTPException(status_code=400, detail="Vous n'êtes pas autorisé à voter")
+    
+    if voter[0]:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Déjà voted")
     
     # Record vote
-    c.execute(
-        "INSERT INTO votes (proposal_id, voter_address, vote) VALUES (?, ?, ?)",
-        (proposal_id, vote.voter_address, True)
-    )
-    c.execute("UPDATE proposal_voters SET has_voted = TRUE WHERE proposal_id = ? AND voter_address = ?",
-              (proposal_id, vote.voter_address))
+    c.execute("""
+        INSERT INTO votes (proposal_id, voter_id, vote) VALUES (?, ?, ?)
+    """, (proposal_id, user["id"], vote.vote))
+    
+    c.execute("UPDATE proposal_voters SET has_voted = TRUE WHERE proposal_id = ? AND voter_id = ?",
+              (proposal_id, user["id"]))
+    
     c.execute("UPDATE proposals SET vote_count = vote_count + 1 WHERE id = ?", (proposal_id,))
     
     conn.commit()
     conn.close()
     
-    return {"status": "voted", "proposal_id": proposal_id, "voter": vote.voter_address}
+    return {"status": "voted", "proposal_id": proposal_id}
 
 # === VOTES ===
 
-@app.get("/proposals/{proposal_id}/votes", response_model=List[VoteResponse])
-def get_proposal_votes(proposal_id: int):
+@app.get("/api/proposals/{proposal_id}/votes")
+def get_proposal_votes(proposal_id: int, authorization: str = None):
+    user = require_auth(authorization)
+    
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM votes WHERE proposal_id = ?", (proposal_id,))
+    c.execute("""
+        SELECT u.name, u.email, v.vote, v.voted_at
+        FROM votes v
+        JOIN users u ON v.voter_id = u.id
+        WHERE v.proposal_id = ?
+    """, (proposal_id,))
     rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]
-
-@app.get("/votes/{vote_id}", response_model=VoteResponse)
-def get_vote(vote_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM votes WHERE id = ?", (vote_id,))
-    row = c.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Vote not found")
-    return dict(row)
 
 if __name__ == "__main__":
     import uvicorn
