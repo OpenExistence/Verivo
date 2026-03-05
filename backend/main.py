@@ -259,10 +259,11 @@ def register(user: UserCreate):
     conn.commit()
     
     c.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    c.row_factory = sqlite3.Row
     row = c.fetchone()
     conn.close()
     
-    user_data = dict(row)
+    user_data = {"id": row["id"], "email": row["email"], "name": row["name"], "role": row["role"], "wallet_address": row["wallet_address"], "created_at": row["created_at"]}
     return {
         "token": token,
         "user": {

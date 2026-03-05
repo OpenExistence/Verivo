@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Authentication', () => {
   const API_URL = 'http://localhost:8000';
-  const FRONTEND_URL = 'http://localhost:5173';
+  const FRONTEND_URL = 'http://localhost:3000';
 
   test.beforeEach(async ({ page }) => {
     // Wait for app to be ready
