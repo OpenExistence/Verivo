@@ -1,0 +1,9 @@
+node_modules/
+.git/
+venv/
+*.log
+.env
+.env.local
+*.db
+dist/
+cache/

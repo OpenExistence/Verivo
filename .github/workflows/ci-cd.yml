@@ -1,0 +1,70 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, ci-cd]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+      
+      - name: Run backend tests
+        run: |
+          echo "No backend tests yet"
+          # Add tests later
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Docker images
+        run: |
+          docker compose build
+      
+      - name: Test Docker compose
+        run: |
+          docker compose up -d
+          sleep 10
+          curl -f http://localhost:8000/health || exit 1
+          docker compose down
