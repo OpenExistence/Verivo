@@ -116,6 +116,23 @@ npx hardhat run scripts/deploy.js --network sepolia
 - **Database**: SQLite
 - **Blockchain**: Solidity + Hardhat
 - **Réseau**: Ethereum Sepolia (testnet)
+- **Tests**: Playwright
+
+## Tests
+
+### Lancer les tests
+
+```bash
+# Installer Playwright
+npm install @playwright/test
+
+# Lancer les tests API
+npx playwright test tests/api-auth.spec.js
+```
+
+### Tests disponibles
+
+- `tests/api-auth.spec.js` - Tests d'authentification API (inscription, connexion, logout)
 
 ## Licence
 
