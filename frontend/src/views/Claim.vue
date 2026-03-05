@@ -171,7 +171,7 @@ onMounted(() => {
 }
 
 .btn-claim {
-  background: linear-gradient(135deg, var(--accent), #3498db);
+  background: linear-gradient(135deg, var(--accent), #2980b9);
   color: #0a0a0a;
   border: none;
   padding: 1rem 2.5rem;
