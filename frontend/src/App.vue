@@ -37,7 +37,7 @@ provide('account', account)
 const connectWallet = async () => {
   if (window.ethereum) {
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum)
+      const provider = new ethers.providers.Web3Provider(window.ethereum)
       const accounts = await provider.send("eth_requestAccounts", [])
       account.value = accounts[0]
     } catch (err) {
