@@ -1,0 +1,28 @@
+{
+  "name": "verivo",
+  "version": "1.0.0",
+  "description": "MVP pour un système de vote basé sur NFT (ERC-721) sur Sepolia.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://OpenExistence@github.com/OpenExistence/Verivo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/OpenExistence/Verivo/issues"
+  },
+  "homepage": "https://github.com/OpenExistence/Verivo#readme",
+  "devDependencies": {
+    "@openzeppelin/contracts": "4.9",
+    "ethers": "^5.8.0",
+    "hardhat": "2.19"
+  }
+}

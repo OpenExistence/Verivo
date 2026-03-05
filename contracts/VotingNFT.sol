@@ -16,7 +16,7 @@ contract VotingNFT is ERC721, Ownable {
     event VotingRightGranted(uint256 indexed proposalId, address indexed to);
     event VoteCast(uint256 indexed proposalId, address indexed voter);
     
-    constructor() ERC721("VotingRight", "VOTE") Ownable(msg.sender) {}
+    constructor() ERC721("VotingRight", "VOTE") Ownable() {}
     
     function setProposalContract(address _proposalContract) external onlyOwner {
         proposalContract = _proposalContract;
@@ -54,9 +54,5 @@ contract VotingNFT is ERC721, Ownable {
     // Check if address has already voted
     function hasVotedOn(uint256 proposalId, address account) external view returns (bool) {
         return hasVoted[proposalId][account];
-    }
-    
-    function _startTokenId() internal pure override returns (uint256) {
-        return 1;
     }
 }

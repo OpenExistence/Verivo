@@ -21,7 +21,7 @@ contract ProposalVoting is Ownable {
     event VoteCast(uint256 indexed proposalId, address indexed voter);
     event ProposalExecuted(uint256 indexed proposalId);
     
-    constructor(address _votingNFTContract) Ownable(msg.sender) {
+    constructor(address _votingNFTContract) Ownable() {
         votingNFTContract = _votingNFTContract;
     }
     
