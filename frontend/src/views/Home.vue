@@ -16,39 +16,44 @@
         v-for="proposal in proposals" 
         :key="proposal.id" 
         class="proposal-card"
-        :class="{ executed: proposal.executed }"
+        :class="{ executed: proposal.status === 'executed' }"
       >
         <div class="proposal-header">
           <span class="proposal-id">#{{ proposal.id }}</span>
-          <span v-if="proposal.executed" class="badge-executed">Exécutée</span>
-          <span v-else-if="proposal.voting_open" class="badge-open">Vote ouvert</span>
-          <span v-else class="badge-closed">Vote fermé</span>
+          <span class="vote-type-badge">{{ proposal.vote_type }}</span>
         </div>
         
+        <h3 class="proposal-title">{{ proposal.title }}</h3>
         <p class="proposal-desc">{{ proposal.description }}</p>
         
-        <div class="proposal-stats">
-          <div class="stat">
+        <div class="proposal-footer">
+          <div class="proposal-stats">
             <span class="stat-value">{{ proposal.vote_count }}</span>
             <span class="stat-label">votes</span>
           </div>
+          
+          <div class="status-badges">
+            <span class="status" :class="proposal.status">{{ proposal.status }}</span>
+            <span v-if="proposal.voting_open" class="status open">Ouvert</span>
+            <span v-else class="status closed">Fermé</span>
+          </div>
         </div>
         
-        <div v-if="proposal.voting_open && !proposal.executed">
+        <div v-if="proposal.voting_open && proposal.status !== 'executed'" class="vote-action">
           <button 
             v-if="!hasVoted(proposal.id)"
-            @click="claimAndVote(proposal.id)" 
+            @click="vote(proposal.id)" 
             class="btn-vote"
-            :disabled="claiming"
+            :disabled="voting"
           >
-            {{ claiming ? 'Transaction en cours...' : 'Claim & Voter' }}
+            {{ voting ? 'Vote en cours...' : 'Voter' }}
           </button>
           <div v-else class="voted">
             ✓ Vote enregistré
           </div>
         </div>
         
-        <div v-else-if="proposal.executed" class="closed">
+        <div v-else-if="proposal.status === 'executed'" class="closed">
           ✓ Vote clos
         </div>
         <div v-else class="no-voting">
@@ -64,7 +69,7 @@ import { ref, onMounted, inject } from 'vue'
 
 const proposals = ref([])
 const loading = ref(true)
-const claiming = ref(false)
+const voting = ref(false)
 const votedProposals = ref([])
 const account = inject('account')
 
@@ -85,16 +90,14 @@ const hasVoted = (proposalId) => {
   return votedProposals.value.includes(proposalId)
 }
 
-const claimAndVote = async (proposalId) => {
+const vote = async (proposalId) => {
   if (!account.value) {
     alert("Connectez votre wallet!")
     return
   }
   
-  claiming.value = true
+  voting.value = true
   try {
-    // Ici on appellera le smart contract pour mint + voter
-    // Pour le MVP, on utilise l'API
     const res = await fetch(`${API_URL}/proposals/${proposalId}/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,7 +114,7 @@ const claimAndVote = async (proposalId) => {
   } catch (err) {
     alert("Erreur de connexion")
   } finally {
-    claiming.value = false
+    voting.value = false
   }
 }
 
@@ -141,7 +144,7 @@ onMounted(fetchProposals)
 
 .proposals-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
 }
 
@@ -151,6 +154,8 @@ onMounted(fetchProposals)
   padding: 1.5rem;
   border: 1px solid rgba(255,255,255,0.05);
   transition: transform 0.2s, border-color 0.2s;
+  display: flex;
+  flex-direction: column;
 }
 
 .proposal-card:hover {
@@ -166,7 +171,7 @@ onMounted(fetchProposals)
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .proposal-id {
@@ -174,55 +179,72 @@ onMounted(fetchProposals)
   font-size: 0.875rem;
 }
 
-.badge-executed, .badge-open, .badge-closed {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.badge-executed {
-  background: var(--success);
-  color: #0a0a0a;
-}
-
-.badge-open {
-  background: rgba(52, 152, 219, 0.2);
+.vote-type-badge {
+  background: rgba(52, 152, 219, 0.15);
   color: var(--accent);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
 }
 
-.badge-closed {
-  background: rgba(255,255,255,0.1);
-  color: var(--text-muted);
+.proposal-title {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
 .proposal-desc {
-  margin-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
   line-height: 1.5;
+  flex: 1;
+  margin-bottom: 1rem;
+}
+
+.proposal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 .proposal-stats {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.stat {
   display: flex;
   align-items: baseline;
   gap: 0.25rem;
 }
 
 .stat-value {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--accent);
 }
 
 .stat-label {
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
 }
+
+.status-badges {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.status {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.status.pending { background: rgba(255,255,255,0.1); }
+.status.approved { background: rgba(74,222,128,0.2); color: var(--success); }
+.status.rejected { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+.status.executed { background: var(--success); color: #0a0a0a; }
+.status.open { background: rgba(52,152,219,0.2); color: var(--accent); }
+.status.closed { background: rgba(255,255,255,0.1); color: var(--text-muted); }
 
 .btn-vote {
   width: 100%;

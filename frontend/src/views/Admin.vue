@@ -1,14 +1,26 @@
 <template>
   <div class="admin">
     <div class="page-header">
-      <h1>Admin - Créer une proposition</h1>
-      <p class="subtitle">Créez une proposition et sélectionnez les votants</p>
+      <h1>Admin</h1>
+      <p class="subtitle">Gérez les propositions et les votants</p>
     </div>
 
     <div class="admin-card">
+      <h2>Nouvelle proposition</h2>
       <form @submit.prevent="createProposal" class="proposal-form">
         <div class="form-group">
-          <label for="description">Description de la proposition</label>
+          <label for="title">Titre</label>
+          <input 
+            id="title" 
+            v-model="title" 
+            type="text"
+            placeholder="Titre de la proposition"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
           <textarea 
             id="description" 
             v-model="description" 
@@ -19,25 +31,32 @@
         </div>
 
         <div class="form-group">
-          <label for="voters">Addresses des votants (séparées par virgule)</label>
+          <label for="voteType">Type de vote</label>
+          <select id="voteType" v-model="voteType">
+            <option v-for="vt in voteTypes" :key="vt.name" :value="vt.name">
+              {{ vt.description || vt.name }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="voters">Votants (adresses séparées par virgule)</label>
           <textarea 
             id="voters" 
             v-model="votersInput" 
             placeholder="0x..., 0x..., 0x..."
-            rows="3"
+            rows="2"
           ></textarea>
-          <span class="hint">Laissez vide pour ajouter les votants plus tard</span>
         </div>
 
         <button type="submit" class="btn-submit" :disabled="submitting">
-          {{ submitting ? 'Création en cours...' : 'Créer la proposition' }}
+          {{ submitting ? 'Création...' : 'Créer la proposition' }}
         </button>
       </form>
 
       <div v-if="success" class="success">
         <span>✓</span> Proposition créée! (#{{ proposalId }})
       </div>
-
       <div v-if="error" class="error">{{ error }}</div>
     </div>
 
@@ -50,30 +69,31 @@
     <div v-else class="proposals-list">
       <div v-for="proposal in proposals" :key="proposal.id" class="proposal-item">
         <div class="proposal-info">
-          <span class="proposal-id">#{{ proposal.id }}</span>
+          <div class="proposal-header">
+            <span class="proposal-id">#{{ proposal.id }}</span>
+            <span class="vote-type-badge">{{ proposal.vote_type }}</span>
+          </div>
+          <h3 class="proposal-title">{{ proposal.title }}</h3>
           <p class="proposal-desc">{{ proposal.description }}</p>
-          <span class="status" :class="{ open: proposal.voting_open }">
-            {{ proposal.voting_open ? 'Vote ouvert' : 'Vote fermé' }}
-          </span>
+          <div class="proposal-meta">
+            <span class="status" :class="proposal.status">{{ proposal.status }}</span>
+            <span class="status" :class="{ open: proposal.voting_open }">
+              {{ proposal.voting_open ? 'Vote ouvert' : 'Vote fermé' }}
+            </span>
+          </div>
         </div>
         
         <div class="proposal-actions">
           <span class="vote-count">{{ proposal.vote_count }} votes</span>
           
-          <div v-if="!proposal.voting_open && !proposal.executed" class="start-voting">
-            <input 
-              type="text" 
-              :placeholder="'Votants pour #' + proposal.id"
-              v-model="votersInputs[proposal.id]"
-              class="voters-input"
-            />
+          <div v-if="!proposal.voting_open && proposal.status === 'pending'" class="start-voting">
             <button @click="startVoting(proposal.id)" class="btn-start">
-              Ouvrir vote
+              Ouvrir le vote
             </button>
           </div>
           
           <button 
-            v-if="proposal.voting_open && !proposal.executed"
+            v-if="proposal.voting_open && proposal.status !== 'executed'"
             @click="executeProposal(proposal.id)" 
             class="btn-execute"
             :disabled="executing"
@@ -81,7 +101,7 @@
             Exécuter
           </button>
           
-          <span v-if="proposal.executed" class="executed-badge">Exécutée</span>
+          <span v-if="proposal.status === 'executed'" class="executed-badge">Exécutée</span>
         </div>
       </div>
     </div>
@@ -91,8 +111,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
+const title = ref('')
 const description = ref('')
+const voteType = ref('simple_majority')
 const votersInput = ref('')
+const voteTypes = ref([])
 const proposals = ref([])
 const loading = ref(true)
 const submitting = ref(false)
@@ -100,9 +123,17 @@ const executing = ref(false)
 const success = ref(false)
 const error = ref('')
 const proposalId = ref(null)
-const votersInputs = ref({})
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+const fetchVoteTypes = async () => {
+  try {
+    const res = await fetch(`${API_URL}/vote-types`)
+    voteTypes.value = await res.json()
+  } catch (err) {
+    console.error("Erreur vote types:", err)
+  }
+}
 
 const fetchProposals = async () => {
   try {
@@ -116,7 +147,7 @@ const fetchProposals = async () => {
 }
 
 const createProposal = async () => {
-  if (!description.value.trim()) return
+  if (!title.value.trim() || !description.value.trim()) return
   
   error.value = ''
   success.value = false
@@ -127,7 +158,9 @@ const createProposal = async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
+        title: title.value,
         description: description.value,
+        vote_type: voteType.value,
         voters: votersInput.value ? votersInput.value.split(',').map(a => a.trim()) : []
       })
     })
@@ -136,6 +169,7 @@ const createProposal = async () => {
       const data = await res.json()
       proposalId.value = data.id
       success.value = true
+      title.value = ''
       description.value = ''
       votersInput.value = ''
       await fetchProposals()
@@ -151,27 +185,11 @@ const createProposal = async () => {
 }
 
 const startVoting = async (proposalId) => {
-  const voters = votersInputs.value[proposalId]?.split(',').map(a => a.trim()) || []
-  if (voters.length === 0) {
-    alert("Ajoutez au moins un votant")
-    return
-  }
-  
   try {
-    const res = await fetch(`${API_URL}/proposals/${proposalId}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ voters })
-    })
-    
-    if (res.ok) {
-      await fetchProposals()
-    } else {
-      const data = await res.json()
-      alert(data.detail || "Erreur")
-    }
+    const res = await fetch(`${API_URL}/proposals/${proposalId}/start`, { method: 'POST' })
+    if (res.ok) await fetchProposals()
   } catch (err) {
-    alert("Erreur de connexion")
+    alert("Erreur")
   }
 }
 
@@ -184,7 +202,10 @@ const executeProposal = async (id) => {
   }
 }
 
-onMounted(fetchProposals)
+onMounted(() => {
+  fetchVoteTypes()
+  fetchProposals()
+})
 </script>
 
 <style scoped>
@@ -203,7 +224,7 @@ onMounted(fetchProposals)
 }
 
 .admin-card {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
   background: var(--card-bg);
   border-radius: 16px;
@@ -212,8 +233,13 @@ onMounted(fetchProposals)
   margin-bottom: 3rem;
 }
 
-.proposal-form .form-group {
+.admin-card h2 {
+  font-size: 1.25rem;
   margin-bottom: 1.5rem;
+}
+
+.proposal-form .form-group {
+  margin-bottom: 1.25rem;
 }
 
 .proposal-form label {
@@ -222,28 +248,32 @@ onMounted(fetchProposals)
   font-weight: 500;
 }
 
-.proposal-form textarea {
+.proposal-form input,
+.proposal-form textarea,
+.proposal-form select {
   width: 100%;
-  padding: 1rem;
+  padding: 0.75rem;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.05);
   color: var(--text);
   font-size: 1rem;
   font-family: inherit;
+}
+
+.proposal-form select {
+  cursor: pointer;
+}
+
+.proposal-form textarea {
   resize: vertical;
 }
 
-.proposal-form textarea:focus {
+.proposal-form input:focus,
+.proposal-form textarea:focus,
+.proposal-form select:focus {
   outline: none;
   border-color: var(--accent);
-}
-
-.hint {
-  display: block;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
 }
 
 .btn-submit {
@@ -254,13 +284,7 @@ onMounted(fetchProposals)
   padding: 1rem;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 1rem;
   cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.btn-submit:hover:not(:disabled) {
-  opacity: 0.9;
 }
 
 .btn-submit:disabled {
@@ -269,17 +293,11 @@ onMounted(fetchProposals)
 }
 
 .success {
-  margin-top: 1.5rem;
+  margin-top: 1rem;
   padding: 1rem;
   background: rgba(74, 222, 128, 0.1);
   border-radius: 8px;
   color: var(--success);
-  text-align: center;
-}
-
-.success span {
-  font-size: 1.25rem;
-  margin-right: 0.5rem;
 }
 
 .error {
@@ -313,7 +331,6 @@ onMounted(fetchProposals)
 .proposal-item {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
   background: var(--card-bg);
   padding: 1.5rem;
   border-radius: 12px;
@@ -324,29 +341,54 @@ onMounted(fetchProposals)
   flex: 1;
 }
 
+.proposal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 .proposal-id {
   color: var(--text-muted);
   font-size: 0.875rem;
 }
 
+.vote-type-badge {
+  background: rgba(52, 152, 219, 0.2);
+  color: var(--accent);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.proposal-title {
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
 .proposal-desc {
-  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
 
-.status {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  background: rgba(255,255,255,0.1);
-  color: var(--text-muted);
+.proposal-meta {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.status.open {
-  background: rgba(52, 152, 219, 0.2);
-  color: var(--accent);
+.status {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
 }
+
+.status.pending { background: rgba(255,255,255,0.1); }
+.status.approved { background: rgba(74,222,128,0.2); color: var(--success); }
+.status.rejected { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+.status.open { background: rgba(52,152,219,0.2); color: var(--accent); }
 
 .proposal-actions {
   display: flex;
@@ -360,21 +402,6 @@ onMounted(fetchProposals)
   font-weight: 600;
 }
 
-.start-voting {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.voters-input {
-  width: 150px;
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.05);
-  color: var(--text);
-  font-size: 0.75rem;
-}
-
 .btn-start {
   background: var(--accent);
   color: #0a0a0a;
@@ -382,7 +409,6 @@ onMounted(fetchProposals)
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -404,16 +430,11 @@ onMounted(fetchProposals)
 @media (max-width: 768px) {
   .proposal-item {
     flex-direction: column;
-    gap: 1rem;
   }
-  
   .proposal-actions {
     width: 100%;
     align-items: stretch;
-  }
-  
-  .start-voting {
-    flex-direction: column;
+    margin-top: 1rem;
   }
 }
 </style>
