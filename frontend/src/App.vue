@@ -7,6 +7,7 @@
       </div>
       <nav class="nav">
         <router-link to="/">Propositions</router-link>
+        <router-link to="/about">Comment ça marche</router-link>
         <router-link to="/admin">Admin</router-link>
         <button v-if="!account" @click="connectWallet" class="btn-connect">
           Connect Wallet
