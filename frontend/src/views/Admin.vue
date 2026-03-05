@@ -2,7 +2,7 @@
   <div class="admin">
     <div class="page-header">
       <h1>Admin - Créer une proposition</h1>
-      <p class="subtitle">Soumettez une nouvelle proposition au vote</p>
+      <p class="subtitle">Créez une proposition et sélectionnez les votants</p>
     </div>
 
     <div class="admin-card">
@@ -18,20 +18,31 @@
           ></textarea>
         </div>
 
+        <div class="form-group">
+          <label for="voters">Addresses des votants (séparées par virgule)</label>
+          <textarea 
+            id="voters" 
+            v-model="votersInput" 
+            placeholder="0x..., 0x..., 0x..."
+            rows="3"
+          ></textarea>
+          <span class="hint">Laissez vide pour ajouter les votants plus tard</span>
+        </div>
+
         <button type="submit" class="btn-submit" :disabled="submitting">
           {{ submitting ? 'Création en cours...' : 'Créer la proposition' }}
         </button>
       </form>
 
       <div v-if="success" class="success">
-        <span>✓</span> Proposition créée avec succès! (#{{ proposalId }})
+        <span>✓</span> Proposition créée! (#{{ proposalId }})
       </div>
 
       <div v-if="error" class="error">{{ error }}</div>
     </div>
 
     <div class="section-header">
-      <h2>Propositions existantes</h2>
+      <h2>Propositions</h2>
     </div>
 
     <div v-if="loading" class="loading">Chargement...</div>
@@ -41,13 +52,28 @@
         <div class="proposal-info">
           <span class="proposal-id">#{{ proposal.id }}</span>
           <p class="proposal-desc">{{ proposal.description }}</p>
+          <span class="status" :class="{ open: proposal.voting_open }">
+            {{ proposal.voting_open ? 'Vote ouvert' : 'Vote fermé' }}
+          </span>
         </div>
         
         <div class="proposal-actions">
           <span class="vote-count">{{ proposal.vote_count }} votes</span>
           
+          <div v-if="!proposal.voting_open && !proposal.executed" class="start-voting">
+            <input 
+              type="text" 
+              :placeholder="'Votants pour #' + proposal.id"
+              v-model="votersInputs[proposal.id]"
+              class="voters-input"
+            />
+            <button @click="startVoting(proposal.id)" class="btn-start">
+              Ouvrir vote
+            </button>
+          </div>
+          
           <button 
-            v-if="!proposal.executed"
+            v-if="proposal.voting_open && !proposal.executed"
             @click="executeProposal(proposal.id)" 
             class="btn-execute"
             :disabled="executing"
@@ -55,7 +81,7 @@
             Exécuter
           </button>
           
-          <span v-else class="executed-badge">Exécutée</span>
+          <span v-if="proposal.executed" class="executed-badge">Exécutée</span>
         </div>
       </div>
     </div>
@@ -66,6 +92,7 @@
 import { ref, onMounted } from 'vue'
 
 const description = ref('')
+const votersInput = ref('')
 const proposals = ref([])
 const loading = ref(true)
 const submitting = ref(false)
@@ -73,6 +100,7 @@ const executing = ref(false)
 const success = ref(false)
 const error = ref('')
 const proposalId = ref(null)
+const votersInputs = ref({})
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -98,7 +126,10 @@ const createProposal = async () => {
     const res = await fetch(`${API_URL}/proposals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: description.value })
+      body: JSON.stringify({ 
+        description: description.value,
+        voters: votersInput.value ? votersInput.value.split(',').map(a => a.trim()) : []
+      })
     })
     
     if (res.ok) {
@@ -106,10 +137,11 @@ const createProposal = async () => {
       proposalId.value = data.id
       success.value = true
       description.value = ''
+      votersInput.value = ''
       await fetchProposals()
     } else {
       const data = await res.json()
-      error.value = data.detail || "Erreur lors de la création"
+      error.value = data.detail || "Erreur"
     }
   } catch (err) {
     error.value = "Erreur de connexion"
@@ -118,13 +150,35 @@ const createProposal = async () => {
   }
 }
 
+const startVoting = async (proposalId) => {
+  const voters = votersInputs.value[proposalId]?.split(',').map(a => a.trim()) || []
+  if (voters.length === 0) {
+    alert("Ajoutez au moins un votant")
+    return
+  }
+  
+  try {
+    const res = await fetch(`${API_URL}/proposals/${proposalId}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voters })
+    })
+    
+    if (res.ok) {
+      await fetchProposals()
+    } else {
+      const data = await res.json()
+      alert(data.detail || "Erreur")
+    }
+  } catch (err) {
+    alert("Erreur de connexion")
+  }
+}
+
 const executeProposal = async (id) => {
   executing.value = true
   try {
-    // TODO: Appeler le smart contract pour exécuter
     await fetchProposals()
-  } catch (err) {
-    error.value = "Erreur lors de l'exécution"
   } finally {
     executing.value = false
   }
@@ -182,13 +236,20 @@ onMounted(fetchProposals)
 
 .proposal-form textarea:focus {
   outline: none;
-  border-color: var(#d4af37);
+  border-color: var(--accent);
+}
+
+.hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .btn-submit {
   width: 100%;
-  background: var(#d4af37);
-  color: white;
+  background: var(--accent);
+  color: #0a0a0a;
   border: none;
   padding: 1rem;
   border-radius: 8px;
@@ -252,7 +313,7 @@ onMounted(fetchProposals)
 .proposal-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   background: var(--card-bg);
   padding: 1.5rem;
   border-radius: 12px;
@@ -270,37 +331,69 @@ onMounted(fetchProposals)
 
 .proposal-desc {
   margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.1);
+  color: var(--text-muted);
+}
+
+.status.open {
+  background: rgba(52, 152, 219, 0.2);
+  color: var(--accent);
 }
 
 .proposal-actions {
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 
 .vote-count {
-  color: var(#d4af37);
+  color: var(--accent);
   font-weight: 600;
+}
+
+.start-voting {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.voters-input {
+  width: 150px;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 0.75rem;
+}
+
+.btn-start {
+  background: var(--accent);
+  color: #0a0a0a;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  cursor: pointer;
 }
 
 .btn-execute {
   background: var(--success);
-  color: #000;
+  color: #0a0a0a;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.btn-execute:hover:not(:disabled) {
-  opacity: 0.8;
-}
-
-.btn-execute:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .executed-badge {
@@ -311,13 +404,16 @@ onMounted(fetchProposals)
 @media (max-width: 768px) {
   .proposal-item {
     flex-direction: column;
-    align-items: flex-start;
     gap: 1rem;
   }
   
   .proposal-actions {
     width: 100%;
-    justify-content: space-between;
+    align-items: stretch;
+  }
+  
+  .start-voting {
+    flex-direction: column;
   }
 }
 </style>

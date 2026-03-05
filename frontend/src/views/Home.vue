@@ -21,6 +21,8 @@
         <div class="proposal-header">
           <span class="proposal-id">#{{ proposal.id }}</span>
           <span v-if="proposal.executed" class="badge-executed">Exécutée</span>
+          <span v-else-if="proposal.voting_open" class="badge-open">Vote ouvert</span>
+          <span v-else class="badge-closed">Vote fermé</span>
         </div>
         
         <p class="proposal-desc">{{ proposal.description }}</p>
@@ -32,20 +34,25 @@
           </div>
         </div>
         
-        <button 
-          v-if="!proposal.executed && hasVoted(proposal.id)"
-          @click="vote(proposal.id)" 
-          class="btn-vote"
-          :disabled="voting"
-        >
-          {{ voting ? 'Vote en cours...' : 'Voter' }}
-        </button>
+        <div v-if="proposal.voting_open && !proposal.executed">
+          <button 
+            v-if="!hasVoted(proposal.id)"
+            @click="claimAndVote(proposal.id)" 
+            class="btn-vote"
+            :disabled="claiming"
+          >
+            {{ claiming ? 'Transaction en cours...' : 'Claim & Voter' }}
+          </button>
+          <div v-else class="voted">
+            ✓ Vote enregistré
+          </div>
+        </div>
         
-        <div v-else-if="proposal.executed" class="voted">
+        <div v-else-if="proposal.executed" class="closed">
           ✓ Vote clos
         </div>
-        <div v-else class="no-voting-nft">
-          NFT requis pour voter
+        <div v-else class="no-voting">
+          Vote pas encore ouvert
         </div>
       </div>
     </div>
@@ -54,11 +61,10 @@
 
 <script setup>
 import { ref, onMounted, inject } from 'vue'
-import { ethers } from 'ethers'
 
 const proposals = ref([])
 const loading = ref(true)
-const voting = ref(false)
+const claiming = ref(false)
 const votedProposals = ref([])
 const account = inject('account')
 
@@ -79,14 +85,16 @@ const hasVoted = (proposalId) => {
   return votedProposals.value.includes(proposalId)
 }
 
-const vote = async (proposalId) => {
+const claimAndVote = async (proposalId) => {
   if (!account.value) {
     alert("Connectez votre wallet!")
     return
   }
   
-  voting.value = true
+  claiming.value = true
   try {
+    // Ici on appellera le smart contract pour mint + voter
+    // Pour le MVP, on utilise l'API
     const res = await fetch(`${API_URL}/proposals/${proposalId}/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,7 +111,7 @@ const vote = async (proposalId) => {
   } catch (err) {
     alert("Erreur de connexion")
   } finally {
-    voting.value = false
+    claiming.value = false
   }
 }
 
@@ -147,7 +155,7 @@ onMounted(fetchProposals)
 
 .proposal-card:hover {
   transform: translateY(-2px);
-  border-color: var(#d4af37);
+  border-color: var(--accent);
 }
 
 .proposal-card.executed {
@@ -166,13 +174,26 @@ onMounted(fetchProposals)
   font-size: 0.875rem;
 }
 
-.badge-executed {
-  background: var(--success);
-  color: #000;
+.badge-executed, .badge-open, .badge-closed {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.badge-executed {
+  background: var(--success);
+  color: #0a0a0a;
+}
+
+.badge-open {
+  background: rgba(52, 152, 219, 0.2);
+  color: var(--accent);
+}
+
+.badge-closed {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-muted);
 }
 
 .proposal-desc {
@@ -195,7 +216,7 @@ onMounted(fetchProposals)
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(#d4af37);
+  color: var(--accent);
 }
 
 .stat-label {
@@ -205,8 +226,8 @@ onMounted(fetchProposals)
 
 .btn-vote {
   width: 100%;
-  background: var(#d4af37);
-  color: white;
+  background: var(--accent);
+  color: #0a0a0a;
   border: none;
   padding: 0.75rem;
   border-radius: 8px;
@@ -224,7 +245,7 @@ onMounted(fetchProposals)
   cursor: not-allowed;
 }
 
-.voted, .no-voting-nft {
+.voted, .no-voting, .closed {
   text-align: center;
   padding: 0.75rem;
   border-radius: 8px;
@@ -236,7 +257,7 @@ onMounted(fetchProposals)
   color: var(--success);
 }
 
-.no-voting-nft {
+.no-voting, .closed {
   background: rgba(255,255,255,0.05);
   color: var(--text-muted);
 }

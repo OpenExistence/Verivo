@@ -6,53 +6,56 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract VotingNFT is ERC721, Ownable {
     uint256 private _tokenIdCounter;
+    address public proposalContract;
     
-    // Mapping pour vérifier si une adresse a le droit de vote
-    mapping(address => bool) public hasVotingRight;
+    // Mapping: proposalId => allowed voters
+    mapping(uint256 => mapping(address => bool)) public allowedVoters;
+    // Mapping: proposalId => hasVoted
+    mapping(uint256 => mapping(address => bool)) public hasVoted;
     
-    // Événements
-    event VotingRightGranted(address indexed to);
-    event VotingRightRevoked(address indexed from);
+    event VotingRightGranted(uint256 indexed proposalId, address indexed to);
+    event VoteCast(uint256 indexed proposalId, address indexed voter);
     
     constructor() ERC721("VotingRight", "VOTE") Ownable(msg.sender) {}
     
-    /**
-     * @dev Mint un NFT de vote pour une adresse
-     */
-    function grantVotingRight(address to) public onlyOwner {
-        require(!hasVotingRight[to], "Address already has voting right");
+    function setProposalContract(address _proposalContract) external onlyOwner {
+        proposalContract = _proposalContract;
+    }
+    
+    // Allow specific addresses to vote on a specific proposal
+    function allowVoters(uint256 proposalId, address[] calldata voters) external onlyOwner {
+        for (uint i = 0; i < voters.length; i++) {
+            allowedVoters[proposalId][voters[i]] = true;
+        }
+    }
+    
+    // Mint NFT to voter and record vote in one transaction
+    function mintAndVote(uint256 proposalId, string calldata description) external {
+        require(allowedVoters[proposalId][msg.sender], "Not allowed to vote");
+        require(!hasVoted[proposalId][msg.sender], "Already voted");
         
+        // Mint NFT
         _tokenIdCounter++;
         uint256 tokenId = _tokenIdCounter;
-        _mint(to, tokenId);
-        hasVotingRight[to] = true;
+        _mint(msg.sender, tokenId);
         
-        emit VotingRightGranted(to);
+        // Record vote (the description is stored on-chain for this vote)
+        hasVoted[proposalId][msg.sender] = true;
+        
+        emit VotingRightGranted(proposalId, msg.sender);
+        emit VoteCast(proposalId, msg.sender);
     }
     
-    /**
-     * @dev Révoquer le droit de vote (burn le NFT)
-     */
-    function revokeVotingRight(address from) public onlyOwner {
-        require(hasVotingRight[from], "Address has no voting right");
-        
-        uint256 tokenId = tokenOfOwnerByIndex(from, 0);
-        _burn(tokenId);
-        hasVotingRight[from] = false;
-        
-        emit VotingRightRevoked(from);
+    // Check if address can vote on proposal
+    function canVote(uint256 proposalId, address account) external view returns (bool) {
+        return allowedVoters[proposalId][account] && !hasVoted[proposalId][account];
     }
     
-    /**
-     * @dev Vérifie si une adresse peut voter
-     */
-    function canVote(address account) public view returns (bool) {
-        return hasVotingRight[account];
+    // Check if address has already voted
+    function hasVotedOn(uint256 proposalId, address account) external view returns (bool) {
+        return hasVoted[proposalId][account];
     }
     
-    /**
-     * @dev Override pour démarrer l'ID à 1
-     */
     function _startTokenId() internal pure override returns (uint256) {
         return 1;
     }

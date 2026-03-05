@@ -9,15 +9,15 @@ contract ProposalVoting is Ownable {
         string description;
         uint256 voteCount;
         bool executed;
+        bool votingOpen;
         mapping(address => bool) voters;
     }
     
     Proposal[] public proposals;
-    
-    // Adresse du contrat NFT pour vérifier les droits de vote
     address public votingNFTContract;
     
     event ProposalCreated(uint256 indexed proposalId, string description);
+    event VotingStarted(uint256 indexed proposalId);
     event VoteCast(uint256 indexed proposalId, address indexed voter);
     event ProposalExecuted(uint256 indexed proposalId);
     
@@ -25,43 +25,68 @@ contract ProposalVoting is Ownable {
         votingNFTContract = _votingNFTContract;
     }
     
-    /**
-     * @dev Créer une nouvelle proposition
-     */
     function createProposal(string calldata description) external onlyOwner {
         Proposal storage proposal = proposals.push();
         proposal.description = description;
         proposal.voteCount = 0;
         proposal.executed = false;
+        proposal.votingOpen = false;
         
         emit ProposalCreated(proposals.length - 1, description);
     }
     
-    /**
-     * @dev Voter pour une proposition (vérifie le NFT)
-     */
-    function vote(uint256 proposalId) external {
+    // Allow specific voters for a proposal and start voting
+    function startVoting(uint256 proposalId, address[] calldata voters) external onlyOwner {
         require(proposalId < proposals.length, "Proposal does not exist");
+        require(!proposals[proposalId].votingOpen, "Voting already open");
+        
         Proposal storage proposal = proposals[proposalId];
-        require(!proposal.executed, "Proposal already executed");
-        require(!proposal.voters[msg.sender], "Already voted");
+        proposal.votingOpen = true;
         
-        // Vérification via interface ERC721
-        try IERC721(votingNFTContract).balanceOf(msg.sender) returns (uint256 balance) {
-            require(balance > 0, "No voting NFT");
-        } catch {
-            revert("Voting NFT contract invalid");
-        }
+        // Call NFT contract to allow voters
+        IVotingNFT(votingNFTContract).allowVoters(proposalId, voters);
         
-        proposal.voters[msg.sender] = true;
-        proposal.voteCount++;
-        
-        emit VoteCast(proposalId, msg.sender);
+        emit VotingStarted(proposalId);
     }
     
-    /**
-     * @dev Exécuter une proposition
-     */
+    // Get proposal details
+    function getProposal(uint256 proposalId) external view returns (
+        string memory description,
+        uint256 voteCount,
+        bool executed,
+        bool votingOpen,
+        bool hasVoted
+    ) {
+        require(proposalId < proposals.length, "Proposal does not exist");
+        Proposal storage proposal = proposals[proposalId];
+        return (
+            proposal.description,
+            proposal.voteCount,
+            proposal.executed,
+            proposal.votingOpen,
+            proposal.voters[msg.sender]
+        );
+    }
+    
+    function getProposalCount() external view returns (uint256) {
+        return proposals.length;
+    }
+    
+    // Record vote (called after NFT mint)
+    function recordVote(uint256 proposalId, address voter) external {
+        require(msg.sender == votingNFTContract, "Only NFT contract");
+        require(proposalId < proposals.length, "Proposal does not exist");
+        
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.votingOpen, "Voting not open");
+        require(!proposal.voters[voter], "Already voted");
+        
+        proposal.voters[voter] = true;
+        proposal.voteCount++;
+        
+        emit VoteCast(proposalId, voter);
+    }
+    
     function executeProposal(uint256 proposalId) external onlyOwner {
         require(proposalId < proposals.length, "Proposal does not exist");
         Proposal storage proposal = proposals[proposalId];
@@ -71,35 +96,8 @@ contract ProposalVoting is Ownable {
         
         emit ProposalExecuted(proposalId);
     }
-    
-    /**
-     * @dev Obtenir le nombre de propositions
-     */
-    function getProposalCount() external view returns (uint256) {
-        return proposals.length;
-    }
-    
-    /**
-     * @dev Obtenir les détails d'une proposition
-     */
-    function getProposal(uint256 proposalId) external view returns (
-        string memory description,
-        uint256 voteCount,
-        bool executed,
-        bool hasVoted
-    ) {
-        require(proposalId < proposals.length, "Proposal does not exist");
-        Proposal storage proposal = proposals[proposalId];
-        return (
-            proposal.description,
-            proposal.voteCount,
-            proposal.executed,
-            proposal.voters[msg.sender]
-        );
-    }
 }
 
-// Interface minimale ERC721
-interface IERC721 {
-    function balanceOf(address owner) external view returns (uint256);
+interface IVotingNFT {
+    function allowVoters(uint256 proposalId, address[] calldata voters) external;
 }

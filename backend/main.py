@@ -24,6 +24,7 @@ def init_db():
             description TEXT NOT NULL,
             vote_count INTEGER DEFAULT 0,
             executed BOOLEAN DEFAULT FALSE,
+            voting_open BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -61,7 +62,11 @@ class ProposalResponse(BaseModel):
     description: str
     vote_count: int
     executed: bool
+    voting_open: bool
     created_at: str
+
+class StartVotingRequest(BaseModel):
+    voters: List[str]
 
 class VoteRequest(BaseModel):
     voter_address: str
@@ -96,6 +101,7 @@ def get_proposals():
             "description": row["description"],
             "vote_count": row["vote_count"],
             "executed": bool(row["executed"]),
+            "voting_open": bool(row["voting_open"]),
             "created_at": row["created_at"]
         }
         for row in rows
@@ -118,6 +124,7 @@ def create_proposal(proposal: ProposalCreate):
         "description": proposal.description,
         "vote_count": 0,
         "executed": False,
+        "voting_open": False,
         "created_at": datetime.now().isoformat()
     }
 
@@ -177,6 +184,35 @@ def vote_proposal(proposal_id: int, vote: VoteRequest):
     
     conn.close()
     return {"status": "voted", "proposal_id": proposal_id, "voter": vote.voter_address}
+
+@app.post("/proposals/{proposal_id}/start")
+def start_voting(proposal_id: int, request: StartVotingRequest):
+    """Ouvre le vote pour une proposition avec les votants spécifiés"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Vérifier que la proposition existe
+    c.execute("SELECT voting_open, executed FROM proposals WHERE id = ?", (proposal_id,))
+    proposal = c.fetchone()
+    
+    if not proposal:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    
+    if proposal[0]:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Voting already open")
+    
+    if proposal[1]:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Proposal already executed")
+    
+    # Ouvrir le vote
+    c.execute("UPDATE proposals SET voting_open = TRUE WHERE id = ?", (proposal_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"status": "voting_open", "proposal_id": proposal_id, "voters_count": len(request.voters)}
 
 # === VOTING RIGHTS ===
 
