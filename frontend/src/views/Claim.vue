@@ -171,7 +171,7 @@ onMounted(() => {
 }
 
 .btn-claim {
-  background: linear-gradient(135deg, var(--accent), #c9a227);
+  background: linear-gradient(135deg, var(--accent), #3498db);
   color: #0a0a0a;
   border: none;
   padding: 1rem 2.5rem;
@@ -184,7 +184,7 @@ onMounted(() => {
 
 .btn-claim:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+  box-shadow: 0 8px 20px rgba(93, 173, 226, 0.3);
 }
 
 .btn-claim:disabled {

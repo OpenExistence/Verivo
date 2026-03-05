@@ -71,7 +71,7 @@ onMounted(() => {
 :root {
   --primary: #0a0a0a;
   --secondary: #141414;
-  --accent: #d4af37;
+  --accent: #5dade2;
   --text: #f5f5dc;
   --text-muted: #a8a8a8;
   --card-bg: #1a1a1a;
