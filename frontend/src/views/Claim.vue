@@ -152,7 +152,7 @@ onMounted(() => {
 }
 
 .btn-connect {
-  background: var(--accent);
+  background: var(#d4af37);
   color: white;
   border: none;
   padding: 0.75rem 2rem;
@@ -171,8 +171,8 @@ onMounted(() => {
 }
 
 .btn-claim {
-  background: linear-gradient(135deg, var(--accent), #ff6b6b);
-  color: white;
+  background: linear-gradient(135deg, var(--accent), #c9a227);
+  color: #0a0a0a;
   border: none;
   padding: 1rem 2.5rem;
   border-radius: 12px;
@@ -184,7 +184,7 @@ onMounted(() => {
 
 .btn-claim:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(233, 69, 96, 0.3);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
 }
 
 .btn-claim:disabled {
@@ -217,7 +217,7 @@ onMounted(() => {
 }
 
 .tx-link {
-  color: var(--accent);
+  color: var(#d4af37);
   word-break: break-all;
 }
 

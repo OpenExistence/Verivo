@@ -147,7 +147,7 @@ onMounted(fetchProposals)
 
 .proposal-card:hover {
   transform: translateY(-2px);
-  border-color: var(--accent);
+  border-color: var(#d4af37);
 }
 
 .proposal-card.executed {
@@ -195,7 +195,7 @@ onMounted(fetchProposals)
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(#d4af37);
 }
 
 .stat-label {
@@ -205,7 +205,7 @@ onMounted(fetchProposals)
 
 .btn-vote {
   width: 100%;
-  background: var(--accent);
+  background: var(#d4af37);
   color: white;
   border: none;
   padding: 0.75rem;

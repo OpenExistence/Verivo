@@ -182,12 +182,12 @@ onMounted(fetchProposals)
 
 .proposal-form textarea:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(#d4af37);
 }
 
 .btn-submit {
   width: 100%;
-  background: var(--accent);
+  background: var(#d4af37);
   color: white;
   border: none;
   padding: 1rem;
@@ -279,7 +279,7 @@ onMounted(fetchProposals)
 }
 
 .vote-count {
-  color: var(--accent);
+  color: var(#d4af37);
   font-weight: 600;
 }
 

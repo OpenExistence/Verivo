@@ -69,12 +69,12 @@ onMounted(() => {
 }
 
 :root {
-  --primary: #1a1a2e;
-  --secondary: #16213e;
-  --accent: #e94560;
-  --text: #eaeaea;
-  --text-muted: #a0a0a0;
-  --card-bg: #1f1f3a;
+  --primary: #0a0a0a;
+  --secondary: #141414;
+  --accent: #d4af37;
+  --text: #f5f5dc;
+  --text-muted: #a8a8a8;
+  --card-bg: #1a1a1a;
   --success: #4ade80;
 }
 
